@@ -897,9 +897,12 @@
   layout();
   renderLabels();
   renderKeysButton();
-  // Which build this is, to tell whether a game site already serves the newest one.
+  // Which build this is, to tell whether a game site already serves the newest one, and whether
+  // the font came through (some phones and game sites block it).
   const version = document.querySelector('meta[name="crayon-version"]');
-  document.querySelector('#start .credit').textContent += ` · 버전 ${version ? version.content : '개발판'}`;
+  const credit = document.querySelector('#start .credit');
+  credit.textContent += ` · 버전 ${version ? version.content : '개발판'}`;
+  if (document.fonts) document.fonts.ready.then(() => { credit.textContent += document.fonts.check('16px Jua') ? ' ✓' : ' (글꼴 없음)'; });
 
   // Fetch the handwriting font's Korean letters for every screen now, not on the first visit
   // to each screen (the font comes in many small pieces, one per group of letters).
