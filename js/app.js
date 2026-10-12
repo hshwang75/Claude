@@ -414,17 +414,19 @@
   /* ---------- song menu ---------- */
   function buildMenu() {
     const list = $('song-list');
+    // Up to six songs fit three to a row; more go four to a row so the menu never needs scrolling.
+    list.classList.toggle('cols-4', SONGS.length > 6);
     list.innerHTML = SONGS.map((s, i) => `
       <div class="card" style="--cc: var(${s.color})">
         <img class="ic" data-doodle="${s.doodle}" data-size="58" data-seed="${i + 20}" alt="">
-        <div class="meta">
-          <h3 class="t">${s.title}</h3>
-          <div class="c">${s.composer}</div>
-          <div class="lv" role="img" aria-label="어려움 ${s.level}단계">${[1, 2, 3].map((n) => `<img data-doodle="star" data-size="16" data-seed="${n}" alt=""${n <= s.level ? '' : ' class="off"'}>`).join('')}</div>
+        <h3 class="t">${s.title}</h3>
+        <div class="sub">
+          <span class="c">${s.composer}</span>
+          <span class="lv" role="img" aria-label="어려움 ${s.level}단계">${[1, 2, 3].map((n) => `<img data-doodle="star" data-size="16" data-seed="${n}" alt=""${n <= s.level ? '' : ' class="off"'}>`).join('')}</span>
         </div>
         <div class="acts">
           <button class="cbtn" type="button" data-play="listen" data-id="${s.id}" style="--bg: var(--c-card)">▶ 듣기</button>
-          <button class="cbtn" type="button" data-play="follow" data-id="${s.id}" style="--bg: var(${s.color})">✋ 따라치기</button>
+          <button class="cbtn" type="button" data-play="follow" data-id="${s.id}" style="--bg: var(${s.color})"><span class="hand">✋</span>따라치기</button>
         </div>
       </div>`).join('');
     C.hydrate(list);

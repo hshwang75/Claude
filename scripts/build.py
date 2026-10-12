@@ -2,7 +2,8 @@
 """Package Crayon Piano.
 
   python3 scripts/build.py samples        -> audio/piano/samples.js (lets index.html play piano sound when opened from a folder)
-  python3 scripts/build.py zip            -> dist/crayon-piano-itch.zip (upload this to itch.io)
+  python3 scripts/build.py zip            -> dist/crayon-piano-itch.zip (public, classics only) and
+                                             dist/crayon-piano-family.zip (also the songs in js/songs-family.js)
   python3 scripts/build.py page OUT.html  -> page body for a claude.ai Artifact preview
 """
 import base64
@@ -28,17 +29,29 @@ def build_samples() -> Path:
     return SAMPLES_JS
 
 
-def build_zip() -> Path:
-    out = ROOT / "dist" / "crayon-piano-itch.zip"
+FAMILY_JS = ROOT / "js" / "songs-family.js"
+FAMILY_TAG = '<script src="js/songs-family.js"></script>\n'
+
+
+def build_zip(family: bool) -> Path:
+    """Public build: only the out-of-copyright classics. Family build: also songs-family.js."""
+    out = ROOT / "dist" / ("crayon-piano-family.zip" if family else "crayon-piano-itch.zip")
     out.parent.mkdir(exist_ok=True)
+    skip = {SAMPLES_JS} | (set() if family else {FAMILY_JS})
     paths = [ROOT / f for f in FILES]
     for d in DIRS:
         # samples.js is only for opening from a folder; a website loads the MP3 files.
-        paths += sorted(p for p in (ROOT / d).rglob("*") if p.is_file() and p != SAMPLES_JS)
+        paths += sorted(p for p in (ROOT / d).rglob("*") if p.is_file() and p not in skip)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for p in paths:
             # index.html must sit at the top of the zip for itch.io.
-            z.write(p, p.relative_to(ROOT).as_posix())
+            name = p.relative_to(ROOT).as_posix()
+            if name == "index.html" and not family:
+                html = p.read_text(encoding="utf-8")
+                assert FAMILY_TAG in html, "songs-family.js script tag not found in index.html"
+                z.writestr(name, html.replace(FAMILY_TAG, ""))
+            else:
+                z.write(p, name)
     return out
 
 
@@ -56,7 +69,8 @@ if __name__ == "__main__":
     if cmd == "samples":
         print(build_samples())
     elif cmd == "zip":
-        print(build_zip())
+        print(build_zip(family=False))
+        print(build_zip(family=True))
     elif cmd == "page" and len(sys.argv) > 2:
         print(build_page(Path(sys.argv[2])))
     else:

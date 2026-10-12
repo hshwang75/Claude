@@ -12,6 +12,7 @@
 
 | 노래 | 작곡가 | 어려움 |
 | --- | --- | --- |
+| 넌 할 수 있어 (가족용에만 있어요) | 동요 | ★★ |
 | 작은 별 | 모차르트 | ★ |
 | 꿈속의 고향 | 드보르자크 | ★ |
 | 환희의 송가 | 베토벤 | ★★ |
@@ -30,12 +31,17 @@
 
 ## 무료 게임 사이트(itch.io)에 올리기
 
-올릴 파일은 `dist/crayon-piano-itch.zip` 하나예요. 압축을 풀지 말고 그대로 올려요.
+`dist` 폴더에 두 가지 묶음이 있어요.
+
+- `crayon-piano-itch.zip` (**공개용**): 저작권이 끝난 클래식 6곡만 들어 있어요. 누구나 보는 곳에는 이걸 올려요.
+- `crayon-piano-family.zip` (**가족용**): "넌 할 수 있어"처럼 저작권이 남아 있는 곡(`js/songs-family.js`)도 들어 있어요. 작곡가의 허락 없이 공개하면 안 되니, 올린다면 itch.io에서 **Restricted**(비밀번호로 잠금)로 두세요.
+
+압축을 풀지 말고 zip 파일 그대로 올려요.
 
 1. [itch.io](https://itch.io)에 가입하고 로그인해요.
 2. 오른쪽 위 내 이름 메뉴에서 **Upload new project**를 눌러요.
 3. **Title**에 `크레용 피아노`를 쓰고, **Kind of project**는 **HTML**을 골라요.
-4. **Uploads**에서 `crayon-piano-itch.zip`을 올리고 **This file will be played in the browser**에 체크해요.
+4. **Uploads**에서 zip 파일을 올리고 **This file will be played in the browser**에 체크해요.
 5. **Embed options**에서 다음처럼 정해요.
    - **Mobile friendly** 체크, **Orientation**은 **Landscape**
    - **Fullscreen button** 체크
@@ -47,14 +53,14 @@
 
 ```bash
 python3 scripts/build.py samples   # 피아노 녹음을 바꿨을 때: 폴더에서 열기용 samples.js 다시 만들기
-python3 scripts/build.py zip       # itch.io에 올릴 dist/crayon-piano-itch.zip 다시 만들기
+python3 scripts/build.py zip       # dist의 공개용, 가족용 zip 다시 만들기
 ```
 
-새 노래는 `js/songs.js`에 넣어요. 음 이름 뒤에 박자를 붙여 써요(`C4`는 가운데 도, `E5:.5`는 반 박자, 박자를 안 쓰면 한 박자, `R`은 쉼표).
+새 노래는 `js/songs.js`에 넣어요. 저작권이 남아 있는 곡은 `js/songs-family.js`에 넣으면 공개용 묶음에서 자동으로 빠져요. 음 이름 뒤에 박자를 붙여 써요(`C4`는 가운데 도, `E5:.5`는 반 박자, 박자를 안 쓰면 한 박자, `R`은 쉼표).
 
 ## 만든 재료
 
 - 피아노 소리: Salamander Grand Piano V3, Alexander Holm, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) (자세한 내용은 `audio/piano/README.md`)
 - 글꼴: [Gaegu](https://fonts.google.com/specimen/Gaegu) (SIL Open Font License), Google Fonts에서 불러와요.
 - 그림(곰돌이, 토끼, 꽃, 건반 등)은 모두 코드로 그린 크레용 그림이에요.
-- 노래는 모두 저작권이 끝난 클래식 곡의 멜로디예요.
+- `js/songs.js`의 노래는 모두 저작권이 끝난 클래식 곡의 멜로디예요. `js/songs-family.js`의 곡은 저작권이 남아 있어서 가족용에만 넣었어요.

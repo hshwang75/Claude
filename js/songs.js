@@ -58,6 +58,8 @@
     });
   }
 
-  SONGS.forEach((s) => { s.parsed = parse(s.notes); });
-  window.SONGS = SONGS;
+  // Family-build songs from songs-family.js come first in the menu.
+  const all = [...(window.SONGS_EXTRA || []), ...SONGS];
+  all.forEach((s) => { s.parsed = parse(s.notes); });
+  window.SONGS = all;
 })();
