@@ -69,10 +69,13 @@
     set('--lh', (innerH / z).toFixed(2) + 'px');
     showRotateHint(portrait);
 
-    const size = [kb.offsetWidth, kb.offsetHeight];
-    if (Math.abs(size[0] - state.kbSize[0]) > 1 || Math.abs(size[1] - state.kbSize[1]) > 1) {
-      state.kbSize = size;
-      buildKeyboard();
+    // Keys are placed in percentages, so a small size change (Safari's toolbars coming and going)
+    // only stretches them. The crayon pictures are redrawn only when the size really changes.
+    const kbW = kb.offsetWidth, kbH = kb.offsetHeight, built = state.built;
+    state.kbSize = [kbW, kbH];
+    const count = kbW / 15 >= 62 ? 15 : 12; // C4–C6 on wide screens, C4–G5 on phones
+    if (!built || count !== built.count || Math.abs(kbW - built.W) > built.W * 0.1 || Math.abs(kbH - built.H) > built.H * 0.25) {
+      buildKeyboard(kbW, kbH, count);
     }
   }
 
@@ -88,26 +91,30 @@
   }
 
   /* ---------- keyboard ---------- */
-  function buildKeyboard() {
-    const W = kb.offsetWidth, H = kb.offsetHeight;
+  function buildKeyboard(W, H, count) {
     kb.textContent = '';
     state.keys = {};
+    state.geom = {};
     state.hintKey = null;
+    state.built = null;
     if (W < 60 || H < 60) return;
-    const count = W / 15 >= 62 ? 15 : 12; // C4–C6 on wide screens, C4–G5 on phones
+    state.built = { W, H, count };
     const whites = [];
     for (let m = 60; whites.length < count; m++) if (!isBlack(m)) whites.push(m);
     const kw = W / count, bw = kw * 0.6, bh = H * 0.6;
     const plum = C.hexToRgb(C.tok('--c-black'));
     const dotSize = Math.round(Math.min(kw * 0.64, 64));
+    const pct = (v) => (v * 100).toFixed(4) + '%';
+    state.dotSize = dotSize;
 
     whites.forEach((m, i) => {
       const col = noteColor(m);
       const el = document.createElement('div');
       el.className = 'key white';
       el.dataset.midi = m;
-      el.style.left = i * kw + 'px';
-      el.style.width = kw + 'px';
+      el.style.left = pct(i / count);
+      el.style.width = pct(1 / count);
+      state.geom[m] = { x: (i + 0.5) / count, w: kw, black: false };
       const face = C.key(kw, H, { seed: m * 7, fill: '#fffdf8', edge: C.shade(col, -0.2) });
       face.className = 'face';
       // A colored copy of the key that shows while it is pressed or hinted.
@@ -129,9 +136,10 @@
       const el = document.createElement('div');
       el.className = 'key black';
       el.dataset.midi = b;
-      el.style.left = (i + 1) * kw - bw / 2 + 'px';
-      el.style.width = bw + 'px';
-      el.style.height = bh + 'px';
+      el.style.left = pct((i + 1) / count - 0.3 / count);
+      el.style.width = pct(0.6 / count);
+      el.style.height = '60%';
+      state.geom[b] = { x: (i + 1) / count, w: bw, black: true };
       const face = C.key(bw, bh, { seed: b * 13, fill: plum, edge: C.shade(plum, -0.35), black: true });
       face.className = 'face';
       el.appendChild(face);
@@ -141,6 +149,15 @@
     const rail = C.rail(W, 14, 5, plum);
     rail.className = 'rail';
     kb.appendChild(rail);
+    // The bouncing star of follow mode: one element that moves from key to key.
+    state.marker = document.createElement('div');
+    state.marker.className = 'marker';
+    state.marker.hidden = true;
+    const star = new Image();
+    star.alt = '';
+    star.src = C.doodleURL('star', 50, 7);
+    state.marker.appendChild(star);
+    kb.appendChild(state.marker);
     state.fx = document.createElement('div');
     state.fx.className = 'fx';
     kb.appendChild(state.fx);
@@ -166,10 +183,10 @@
 
   const FX_KINDS = ['heart', 'note', 'star', 'flower'];
   function burst(k, count) {
-    const fx = state.fx;
-    if (!fx || !k.isConnected) return;
-    const black = k.classList.contains('black');
-    const x = k.offsetLeft + k.offsetWidth / 2, y = k.offsetHeight * (black ? 0.45 : 0.55);
+    const fx = state.fx, g = state.geom[k.dataset.midi];
+    if (!fx || !g || !k.isConnected) return;
+    // Positions come from the saved key layout, so no layout has to be measured mid-tap.
+    const x = g.x * state.kbSize[0], y = state.kbSize[1] * (g.black ? 0.3 : 0.55);
     const n = count ?? (Math.random() < 0.5 ? 1 : 2);
     for (let i = 0; i < n; i++) {
       const kind = FX_KINDS[(Math.random() * FX_KINDS.length) | 0];
@@ -207,7 +224,7 @@
   };
   const pointers = new Map();
   kb.addEventListener('pointerdown', (e) => {
-    const k = keyAt(e.clientX, e.clientY);
+    const k = e.target.closest ? e.target.closest('.key') : null;
     if (!k) return;
     e.preventDefault();
     S.unlock();
@@ -242,7 +259,7 @@
     if (e.key === 'Escape') { escape(); return; }
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = state.keys[KEYMAP[e.code]];
-    if (!k || !$('start').hidden || !$('menu').hidden) return;
+    if (!k || !$('start').hidden || menuOpen()) return;
     e.preventDefault();
     S.unlock();
     held.set(e.code, { k, v: userPress(k) });
@@ -284,7 +301,7 @@
       d.classList.toggle('done', j < i);
       d.classList.toggle('now', j === i);
     });
-    track.style.transform = `translateX(${-Math.max(0, i - 2) * 44}px)`;
+    track.style.transform = `translateX(${-Math.max(0, i - 2) * 48}px)`;
   }
 
   /* ---------- listen: the song plays itself ---------- */
@@ -373,30 +390,25 @@
     const F = state.follow;
     if (!F) return;
     setRibbon(F.i);
-    const k = state.keys[F.notes[F.i]];
-    if (!k) return;
+    const m = F.notes[F.i], k = state.keys[m], g = state.geom[m];
+    if (!k || !g) return;
+    // Each key draws its glowing ring once and keeps it; CSS shows it while the key is hinted.
+    if (!k._ring) {
+      k._ring = C.ring(g.w, g.black ? state.built.H * 0.6 : state.built.H, m + 40);
+      k._ring.className = 'ring';
+      k.appendChild(k._ring);
+    }
     k.classList.add('hint');
-    const ring = C.ring(k.offsetWidth, k.offsetHeight, F.i + 40);
-    ring.className = 'ring';
-    k.appendChild(ring);
-    const size = Math.round(Math.min(k.offsetWidth * 0.75, 50));
-    const mk = new Image();
-    mk.alt = '';
-    mk.src = C.doodleURL('star', size, 7);
-    mk.className = 'marker';
+    const mk = state.marker, size = Math.round(Math.min(g.w * 0.75, 50));
     mk.style.width = mk.style.height = size + 'px';
-    mk.style.marginLeft = -size / 2 + 'px';
-    const lbl = k.querySelector('.lbl');
-    mk.style.bottom = lbl ? k.offsetHeight * 0.08 + lbl.offsetHeight + 10 + 'px' : '22%';
-    k.appendChild(mk);
+    mk.style.left = `calc(${(g.x * 100).toFixed(4)}% - ${size / 2}px)`;
+    mk.style.top = g.black ? '18%' : `calc(92% - ${state.dotSize + 12 + size}px)`;
+    mk.hidden = false;
     state.hintKey = k;
   }
   function clearHint() {
-    const k = state.hintKey;
-    if (k) {
-      k.classList.remove('hint');
-      k.querySelectorAll('.ring, .marker').forEach((n) => n.remove());
-    }
+    if (state.hintKey) state.hintKey.classList.remove('hint');
+    if (state.marker) state.marker.hidden = true;
     state.hintKey = null;
   }
   function onUserNote(m) {
@@ -456,10 +468,12 @@
   function openMenu() {
     stopSong();
     $('end').hidden = true;
-    $('menu').hidden = false;
+    $('menu').classList.remove('closed');
     $('song-list').scrollTop = 0;
   }
-  function closeMenu() { $('menu').hidden = true; }
+  // The menu stays laid out while closed, so opening it is only a visibility change.
+  function closeMenu() { $('menu').classList.add('closed'); }
+  const menuOpen = () => !$('menu').classList.contains('closed');
 
   /* ---------- end screen ---------- */
   const NOTE_ICON = () => `<img src="${C.doodleURL('note', 24, 1, C.tok('--c-black'))}" width="24" height="24" alt="">`;
@@ -481,7 +495,8 @@
     $('confetti').textContent = '';
     if (kind === 'follow') {
       $('end-msg').textContent = `${song.title}, 끝까지 다 쳤어요!`;
-      slot.appendChild(C.stamp(180, C.tok('--c-stamp')));
+      state.stamp = state.stamp || C.stamp(180, C.tok('--c-stamp'));
+      slot.appendChild(state.stamp);
       confetti();
       cheer();
       endButton(AGAIN_ICON + '한 번 더', '--c-mi', () => startFollow(song));
@@ -506,7 +521,7 @@
       if (x > lw * 0.22 && x < lw * 0.78 && y > lh * 0.12 && y < lh * 0.86) y = Math.random() < 0.5 ? Math.random() * lh * 0.1 : lh * 0.87 + Math.random() * (lh * 0.13 - size);
       const im = new Image();
       im.alt = '';
-      im.src = C.doodleURL(kinds[k], size, 1 + (i % 5), cols[k]);
+      im.src = C.doodleURL(kinds[k], 40, 1 + (i % 5), cols[k]); // one drawing per kind, shown at any size
       im.width = size; im.height = size;
       im.style.left = x + 'px';
       im.style.top = y + 'px';
@@ -570,7 +585,7 @@
     renderLabels();
   });
   function escape() {
-    if (!$('menu').hidden) closeMenu();
+    if (menuOpen()) closeMenu();
     else if (!$('end').hidden) $('end').hidden = true;
     else if (state.mode !== 'free') stopSong();
   }
@@ -598,4 +613,11 @@
   buildMenu();
   layout();
   renderLabels();
+
+  // Fetch the handwriting font's Korean letters for every screen now, not on the first visit
+  // to each screen (the font comes in many small pieces, one per group of letters).
+  if (document.fonts && document.fonts.load) {
+    const text = stage.textContent + '끝까지다쳤어요잘들었어요이제따라쳐볼까요한번더다른노래건반놀이재즈로듣기참잘했어요';
+    ['400', '700'].forEach((w) => document.fonts.load(`${w} 24px Gaegu`, text).catch(() => {}));
+  }
 })();

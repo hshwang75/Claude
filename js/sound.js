@@ -65,15 +65,44 @@
     return ctx;
   }
 
+  // Each recording is 16 seconds of stereo; decoded, all of them would take about 90 MB, which
+  // makes phones (iPhones especially) stutter. Keep the first 4.5 seconds in mono instead.
+  const KEEP_SECONDS = 4.5;
+  function shrink(buf) {
+    const len = Math.min(buf.length, Math.round(KEEP_SECONDS * buf.sampleRate));
+    const out = ctx.createBuffer(1, len, buf.sampleRate);
+    const o = out.getChannelData(0), chs = buf.numberOfChannels;
+    for (let c = 0; c < chs; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < len; i++) o[i] += d[i] / chs;
+    }
+    const fade = Math.min(len, Math.round(0.5 * buf.sampleRate));
+    for (let i = 0; i < fade; i++) o[len - 1 - i] *= i / fade;
+    return out;
+  }
+  function decodeOne(ab) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (b) => { if (!done) { done = true; resolve(b || null); } };
+      try {
+        const p = ctx.decodeAudioData(ab, finish, () => finish(null));
+        if (p && p.then) p.then(finish, () => finish(null));
+      } catch (e) { finish(null); }
+    });
+  }
+  // Middle notes first (they are played most), one at a time so the phone stays smooth.
+  const ORDER = [60, 63, 66, 69, 72, 57, 75, 78, 81, 84, 54, 51, 48, 45, 42, 39];
   function decodeAll() {
     if (!decoding) {
-      decoding = fetchAll().then(() => Promise.all([...raw.entries()].map(([midi, ab]) => new Promise((resolve) => {
-        const keep = (b) => { if (b) buffers.set(midi, b); resolve(); };
-        try {
-          const p = ctx.decodeAudioData(ab.slice(0), keep, () => resolve());
-          if (p && p.then) p.then(keep, () => resolve());
-        } catch (e) { resolve(); }
-      }))));
+      decoding = fetchAll().then(async () => {
+        for (const midi of ORDER) {
+          const ab = raw.get(midi);
+          if (!ab) continue;
+          raw.delete(midi);
+          const b = await decodeOne(ab);
+          if (b) buffers.set(midi, shrink(b));
+        }
+      });
     }
     return decoding;
   }

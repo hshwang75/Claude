@@ -28,6 +28,14 @@
   const shade = (c, t) => (t < 0 ? mix(toRgb(c), INK, -t) : mix(toRgb(c), [255, 255, 255], t));
   const rgba = (c, a = 1) => { c = toRgb(c); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
   const hex = (c) => '#' + toRgb(c).map((v) => v.toString(16).padStart(2, '0')).join('');
+  // A short blob: URL for a drawn canvas. Long data: URLs are slow when they sit in CSS variables
+  // or many <img> tags, because the browser re-reads the whole string on every style change.
+  function canvasURL(c) {
+    const bin = atob(c.toDataURL('image/png').split(',')[1]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+  }
   function makeCanvas(w, h, scale = DPR) {
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(w * scale));
@@ -166,7 +174,7 @@
       ctx.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + r() * 4, y + Math.sin(a) * l * 0.5 + r() * 4, x + Math.cos(a) * l, y + Math.sin(a) * l);
       ctx.stroke();
     }
-    return c.toDataURL();
+    return canvasURL(c);
   }
   function waxTile(S = 120) {
     const [c, ctx] = makeCanvas(S, S, 1);
@@ -186,7 +194,7 @@
       const s = 0.6 + r() * 1.2;
       ctx.fillRect(r() * S, r() * S, s, s);
     }
-    return c.toDataURL();
+    return canvasURL(c);
   }
 
   /* ---------- doodles ---------- */
@@ -354,7 +362,7 @@
     const r = rngFrom(seed * 97 + kind.length * 13);
     DOODLES[kind](ctx, size, r, col);
     grain(ctx, { x: 0, y: 0, w: size, h: size }, r, 0.55);
-    url = c.toDataURL();
+    url = canvasURL(c);
     cache.set(key, url);
     return url;
   }
