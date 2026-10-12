@@ -4,7 +4,12 @@
   python3 scripts/build.py samples        -> audio/piano/samples.js (lets index.html play piano sound when opened from a folder)
   python3 scripts/build.py zip            -> dist/crayon-piano-itch.zip (public, classics only), plus
                                              dist/crayon-piano-family.zip when js/songs-family.js is present
-  python3 scripts/build.py page OUT.html  -> page body for a claude.ai Artifact preview
+  python3 scripts/build.py page OUT.html [--debug]
+                                          -> page body for a claude.ai Artifact preview
+                                             (--debug shows where each touch lands)
+  python3 scripts/build.py font Jua-Regular.ttf
+                                          -> fonts/jua.woff2, the font cut down to the letters the
+                                             app shows; run again after adding Korean text
 
 js/songs-family.js holds songs that are still under copyright. It is kept out of git
 (.gitignore) because this repository is public: copy it into js/ on your own computer.
@@ -18,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ["index.html", "manifest.webmanifest"]
-DIRS = ["css", "js", "audio", "icons", "songs"]
+DIRS = ["css", "js", "audio", "icons", "songs", "fonts"]
 SAMPLES_JS = ROOT / "audio" / "piano" / "samples.js"
 
 
@@ -66,13 +71,36 @@ def build_zip(family: bool) -> Path:
     return out
 
 
-def build_page(dest: Path) -> Path:
+def build_page(dest: Path, debug: bool = False) -> Path:
     html = index_html(FAMILY_JS.exists())
     title = re.search(r"<title>.*?</title>", html, re.S).group(0)
     head = re.search(r"<!-- app:head -->(.*?)<!-- /app:head -->", html, re.S).group(1)
     body = re.search(r"<!-- app:body -->(.*?)<!-- /app:body -->", html, re.S).group(1)
-    dest.write_text(f"{title}\n{head.strip()}\n{body.strip()}\n", encoding="utf-8")
+    flag = "<script>window.CRAYON_DEBUG = true;</script>\n" if debug else ""
+    dest.write_text(f"{title}\n{head.strip()}\n{flag}{body.strip()}\n", encoding="utf-8")
     return dest
+
+
+FONT_OUT = ROOT / "fonts" / "jua.woff2"
+
+
+def build_font(src: Path) -> Path:
+    """The app carries its font, so it shows even where Google Fonts is blocked. Korean fonts are
+    large, so keep only the letters found in index.html and js/."""
+    from fontTools import subset  # pip install fonttools brotli
+    text = "".join(p.read_text(encoding="utf-8") for p in [ROOT / "index.html", *sorted((ROOT / "js").glob("*.js"))])
+    chars = {c for c in text if ord(c) > 0x7f} | {chr(c) for c in range(0x20, 0x7f)}
+    opts = subset.Options()
+    opts.flavor = "woff2"
+    opts.layout_features = ["*"]
+    opts.name_IDs = ["*"]
+    font = subset.load_font(str(src), opts)
+    sub = subset.Subsetter(opts)
+    sub.populate(text="".join(sorted(chars)))
+    sub.subset(font)
+    FONT_OUT.parent.mkdir(exist_ok=True)
+    subset.save_font(font, str(FONT_OUT), opts)
+    return FONT_OUT
 
 
 if __name__ == "__main__":
@@ -84,6 +112,8 @@ if __name__ == "__main__":
         if FAMILY_JS.exists():
             print(build_zip(family=True))
     elif cmd == "page" and len(sys.argv) > 2:
-        print(build_page(Path(sys.argv[2])))
+        print(build_page(Path(sys.argv[2]), debug="--debug" in sys.argv))
+    elif cmd == "font" and len(sys.argv) > 2:
+        print(build_font(Path(sys.argv[2])))
     else:
         sys.exit(__doc__)

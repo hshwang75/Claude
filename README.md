@@ -86,7 +86,7 @@ python3 scripts/import_scores.py mutopia
 ## 만든 재료
 
 - 피아노 소리: Salamander Grand Piano V3, Alexander Holm, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) (자세한 내용은 `audio/piano/README.md`)
-- 글꼴: [Jua](https://fonts.google.com/specimen/Jua) (SIL Open Font License), Google Fonts에서 불러와요.
+- 글꼴: [Jua](https://fonts.google.com/specimen/Jua) (SIL Open Font License, `fonts/OFL.txt`). 인터넷 글꼴이 막힌 휴대폰에서도 보이도록 앱 안에 들어 있어요(`fonts/jua.woff2`, 앱에 쓰인 글자만 담았어요). 앱에 새 한국어 글자를 넣으면 Google Fonts에서 받은 `Jua-Regular.ttf`로 `pip install fonttools brotli` 후 `python3 scripts/build.py font Jua-Regular.ttf`를 실행해 다시 만들어요.
 - 그림(곰돌이, 토끼, 꽃, 건반 등)은 모두 코드로 그린 크레용 그림이에요.
 - 노래는 모두 저작권이 끝난 클래식 곡이에요.
 - 긴 곡의 악보: [Mutopia Project](https://www.mutopiaproject.org). 대부분 Public Domain이고, 다음 곡은 아래 라이선스를 따라요. 이 곡들의 `songs/` 파일도 같은 라이선스예요.

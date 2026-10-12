@@ -1,6 +1,10 @@
 /* Layout: one landscape "drawing paper" stage. A thin top bar, the crayon keyboard filling
    the rest, and full-stage overlays for the start screen, song menu and the end screen.
    On a phone held upright the whole stage is turned sideways so it still reads as landscape. */
+
+/* Jua (SIL Open Font License, see fonts/OFL.txt), cut down to the letters the app uses by
+   scripts/build.py font. It comes with the app, so it shows even where Google Fonts is blocked. */
+@font-face { font-family: 'Jua'; src: url('../fonts/jua.woff2') format('woff2'); font-display: swap; }
 :root {
   --paper: #fff8ec;
   --ink: #4f3f5c;
@@ -40,8 +44,10 @@ body { font-family: var(--font-hand); font-synthesis: none; }
 [hidden] { display: none !important; }
 img { -webkit-user-drag: none; }
 
+/* Not position: fixed. After the phone is turned, iPhone Safari can draw a fixed element in one
+   place and look for taps on it in another, so the buttons stop working. */
 #stage {
-  position: fixed; left: 0; top: 0; width: 100vw; height: 100vh;
+  position: absolute; left: 0; top: 0; width: 100vw; height: 100vh;
   transform-origin: 0 0;
   display: flex; flex-direction: column; overflow: hidden;
   padding: var(--st) var(--sr) var(--sb) var(--sl);
@@ -252,4 +258,15 @@ img { -webkit-user-drag: none; }
   .fx img { animation-duration: .01s; }
   .track, .dot, .pages { transition: none; }
   .confetti img, .end-row img, .stamp-slot canvas { animation: none; }
+}
+
+/* check mode (see the end of app.js) */
+.debug {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100; max-width: 92vw;
+  padding: 6px 8px; border-radius: 8px; background: #ffffffe0; color: #000;
+  font: 12px/1.35 ui-monospace, Menlo, monospace; white-space: pre-wrap; pointer-events: none;
+}
+.debug-dot {
+  position: fixed; z-index: 101; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  border-radius: 50%; background: #f00; pointer-events: none;
 }

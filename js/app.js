@@ -59,6 +59,7 @@
   document.body.appendChild(probe);
 
   function layout() {
+    if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
     const vw = window.innerWidth, vh = window.innerHeight;
     const portrait = vh > vw;
     const W = portrait ? vh : vw, H = portrait ? vw : vh;
@@ -838,6 +839,38 @@
   window.addEventListener('error', (e) => toast('앗, 문제가 생겼어요: ' + (e.message || '알 수 없는 오류'), 10000));
   window.addEventListener('unhandledrejection', (e) => toast('앗, 문제가 생겼어요: ' + ((e.reason && e.reason.message) || e.reason || '알 수 없는 오류'), 10000));
 
+  // Check mode (preview builds set window.CRAYON_DEBUG, or add ?debug to the address): a red dot
+  // where each touch lands and a line saying what it reached, so a screenshot from a phone we
+  // cannot test shows why a tap was lost.
+  if (window.CRAYON_DEBUG || /[?&#]debug\b/.test(location.href)) {
+    const box = Object.assign(document.createElement('div'), { className: 'debug' });
+    document.body.appendChild(box);
+    const lines = [];
+    const what = (el) => {
+      const b = el && el.closest && el.closest('button, .key, .card, .overlay, .bar');
+      return b ? b.id || b.className.split(' ').slice(0, 2).join('.') : el ? el.id || el.tagName : '-';
+    };
+    const show = (line) => {
+      lines.push(line);
+      if (lines.length > 6) lines.shift();
+      const v = window.visualViewport;
+      box.textContent = `화면 ${innerWidth}x${innerHeight} 스크롤 ${scrollX},${scrollY}` +
+        (v ? ` 보이는곳 ${Math.round(v.width)}x${Math.round(v.height)}+${Math.round(v.offsetLeft)},${Math.round(v.offsetTop)} x${v.scale.toFixed(2)}` : '') +
+        '\n' + lines.join('\n');
+    };
+    ['pointerdown', 'pointerup', 'pointercancel', 'click'].forEach((type) => document.addEventListener(type, (e) => {
+      const x = Math.round(e.clientX), y = Math.round(e.clientY);
+      show(`${type} ${x},${y} → ${what(e.target)} (그 자리: ${what(document.elementFromPoint(x, y))})`);
+      if (type !== 'pointerdown') return;
+      const dot = Object.assign(document.createElement('i'), { className: 'debug-dot' });
+      dot.style.left = x + 'px';
+      dot.style.top = y + 'px';
+      document.body.appendChild(dot);
+      setTimeout(() => dot.remove(), 1500);
+    }, true));
+    show('체크 모드');
+  }
+
   // Keep the page still: no pinch zoom, pull-to-refresh, long-press menus or double-tap zoom.
   document.addEventListener('touchmove', (e) => { if (!e.target.closest('.scroll')) e.preventDefault(); }, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
@@ -851,8 +884,12 @@
   let relayoutTimer = 0;
   const relayout = () => { clearTimeout(relayoutTimer); relayoutTimer = setTimeout(layout, 120); };
   window.addEventListener('resize', relayout);
-  window.addEventListener('orientationchange', relayout);
+  // iPhones report the new size a little late after turning, so look again once it has settled.
+  window.addEventListener('orientationchange', () => { relayout(); setTimeout(layout, 600); setTimeout(layout, 1500); });
   if (window.visualViewport) window.visualViewport.addEventListener('resize', relayout);
+  // The page never scrolls; if the browser moved it (turning the phone can), put it back so what
+  // is drawn and what is touched line up.
+  window.addEventListener('scroll', () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); });
 
   buildMenu();
   layout();
