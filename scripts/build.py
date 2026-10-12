@@ -2,9 +2,12 @@
 """Package Crayon Piano.
 
   python3 scripts/build.py samples        -> audio/piano/samples.js (lets index.html play piano sound when opened from a folder)
-  python3 scripts/build.py zip            -> dist/crayon-piano-itch.zip (public, classics only) and
-                                             dist/crayon-piano-family.zip (also the songs in js/songs-family.js)
+  python3 scripts/build.py zip            -> dist/crayon-piano-itch.zip (public, classics only), plus
+                                             dist/crayon-piano-family.zip when js/songs-family.js is present
   python3 scripts/build.py page OUT.html  -> page body for a claude.ai Artifact preview
+
+js/songs-family.js holds songs that are still under copyright. It is kept out of git
+(.gitignore) because this repository is public: copy it into js/ on your own computer.
 """
 import base64
 import json
@@ -30,7 +33,17 @@ def build_samples() -> Path:
 
 
 FAMILY_JS = ROOT / "js" / "songs-family.js"
+SONGS_TAG = '<script src="js/songs.js"></script>'
 FAMILY_TAG = '<script src="js/songs-family.js"></script>\n'
+
+
+def index_html(family: bool) -> str:
+    """index.html, with songs-family.js loaded before songs.js for the family build."""
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    if family:
+        assert SONGS_TAG in html, "songs.js script tag not found in index.html"
+        html = html.replace(SONGS_TAG, FAMILY_TAG + SONGS_TAG)
+    return html
 
 
 def build_zip(family: bool) -> Path:
@@ -46,17 +59,15 @@ def build_zip(family: bool) -> Path:
         for p in paths:
             # index.html must sit at the top of the zip for itch.io.
             name = p.relative_to(ROOT).as_posix()
-            if name == "index.html" and not family:
-                html = p.read_text(encoding="utf-8")
-                assert FAMILY_TAG in html, "songs-family.js script tag not found in index.html"
-                z.writestr(name, html.replace(FAMILY_TAG, ""))
+            if name == "index.html":
+                z.writestr(name, index_html(family))
             else:
                 z.write(p, name)
     return out
 
 
 def build_page(dest: Path) -> Path:
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    html = index_html(FAMILY_JS.exists())
     title = re.search(r"<title>.*?</title>", html, re.S).group(0)
     head = re.search(r"<!-- app:head -->(.*?)<!-- /app:head -->", html, re.S).group(1)
     body = re.search(r"<!-- app:body -->(.*?)<!-- /app:body -->", html, re.S).group(1)
@@ -70,7 +81,8 @@ if __name__ == "__main__":
         print(build_samples())
     elif cmd == "zip":
         print(build_zip(family=False))
-        print(build_zip(family=True))
+        if FAMILY_JS.exists():
+            print(build_zip(family=True))
     elif cmd == "page" and len(sys.argv) > 2:
         print(build_page(Path(sys.argv[2])))
     else:
