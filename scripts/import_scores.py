@@ -28,13 +28,16 @@ BIN = Path(lilypond.executable()).parent
 
 # id: score path under ftp/, the MIDI track that carries the tune (1 = first staff), license, and
 # speed (1 = the tempo written in the score; scores without a tempo mark play at 60).
+# Optional: start (seconds; skip a long introduction, keeping the bar before the tune comes in) and
+# drop_short (seconds; leave out accompaniment notes shorter than this, for a calmer sound).
 PIECES = {
     "elise": dict(path="BeethovenLv/WoO59/fur_Elise_WoO59/fur_Elise_WoO59.ly", melody=1, license="Public Domain"),
     "minuet": dict(path="BachJS/BWVAnh114/anna-magdalena-04/anna-magdalena-04.ly", melody=1, license="Public Domain", speed=0.85),
     "turkish": dict(path="MozartWA/KV331/KV331_3_RondoAllaTurca/KV331_3_RondoAllaTurca-lys/KV331_3_RondoAllaTurca.ly", melody=1, license="Public Domain", speed=2.0),
     "farmer": dict(path="SchumannR/O68/schumann-op68-10-gai-laboureur/schumann-op68-10-gai-laboureur.ly", melody=3, license="CC BY-SA 2.5"),
     "danube": dict(path="StraussJJ/O314/blue_danube/blue_danube.ly", melody=1, license="CC BY-SA 4.0"),
-    "trout": dict(path="SchubertF/D550/forelle/forelle-lys/forelle.ly", melody=1, license="Public Domain"),
+    # 송어: without the quick rippling runs of the piano part, which sounded busy under the tune.
+    "trout": dict(path="SchubertF/D550/forelle/forelle-lys/forelle.ly", melody=1, license="Public Domain", start=8.0, drop_short=0.15),
     "mountain": dict(path="GriegE/O46/Dans_l_antre_du_roi_de_la_montagne/Dans_l_antre_du_roi_de_la_montagne.ly", melody=1, license="Public Domain", speed=1.7),
     "puppy": dict(path="ChopinFF/O64/chopin_valse_op64_no1/chopin_valse_op64_no1-lys/chopin_valse_op64_no1.ly", melody=1, license="Public Domain"),
     "entertainer": dict(path="JoplinS/entertainer/entertainer.ly", melody=1, license="Public Domain"),
@@ -175,6 +178,13 @@ def export(song_id: str, cfg: dict, mutopia: Path) -> dict:
     melody = set(map(id, melody_of(notes, cfg["melody"])))
     mel = [n for n in notes if id(n) in melody]
     rest = [n for n in notes if id(n) not in melody]
+    if cfg.get("drop_short"):
+        rest = [n for n in rest if n[1] >= cfg["drop_short"]]
+    if cfg.get("start"):
+        cut = cfg["start"]
+        mel = [[n[0] - cut, *n[1:]] for n in mel if n[0] >= cut]
+        rest = [[n[0] - cut, *n[1:]] for n in rest if n[0] >= cut]
+        notes = mel + rest
     speed = cfg.get("speed", 1)
     ms = lambda v: int(round(v * 1000 / speed))
     data = {

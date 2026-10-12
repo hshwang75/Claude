@@ -183,18 +183,26 @@
     g.gain.setValueAtTime(level, when);
     src.connect(g); g.connect(out);
     src.start(when);
-    let done = false;
+    // A note can be told to end more than once: songs set its end when it is scheduled, and 그만
+    // must still be able to cut it short, fade it faster, or drop it before it starts.
+    let endAt = Infinity, stopAt = Infinity;
     const v = {
       release(at = 0, tau = 0.16) {
-        if (done) return; done = true;
-        const t = Math.max(at, ctx.currentTime);
-        g.gain.cancelScheduledValues(t);
-        g.gain.setValueAtTime(t < when ? 0 : level, t);
+        const t = Math.max(at, ctx.currentTime), stop = t <= when ? when : t + tau * 8;
+        if (stop >= stopAt) return;
+        if (t < endAt) {
+          endAt = t;
+          g.gain.cancelScheduledValues(t);
+          g.gain.setValueAtTime(t <= when ? 0 : level, t);
+        }
         g.gain.setTargetAtTime(0, t, tau);
-        try { src.stop(t + tau * 8); } catch (e) { /* already stopped */ }
+        stopAt = stop;
+        try { src.stop(stop); } catch (e) { /* already stopped */ }
+        if (t <= when) gone(); // never sounded
       },
     };
-    src.onended = () => { voices.delete(v); try { g.disconnect(); } catch (e) { /* gone */ } };
+    const gone = () => { voices.delete(v); try { g.disconnect(); } catch (e) { /* gone */ } };
+    src.onended = gone;
     return v;
   }
 
@@ -222,17 +230,23 @@
       o.start(when); o.stop(end);
       return o;
     });
-    let done = false;
+    let endAt = Infinity, stopAt = Infinity;
     const v = {
       release(at = 0, tau = 0.16) {
-        if (done) return; done = true;
-        const t = Math.max(at, ctx.currentTime), p = g.gain;
-        if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t); else { p.cancelScheduledValues(t); p.setValueAtTime(t < when ? 0 : p.value, t); }
+        const t = Math.max(at, ctx.currentTime), p = g.gain, stop = t <= when ? when : t + tau * 8;
+        if (stop >= stopAt) return;
+        if (t <= when) { p.cancelScheduledValues(0); p.setValueAtTime(0, when); } else if (t < endAt) {
+          if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t); else { p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); }
+        }
+        endAt = Math.min(endAt, t);
         p.setTargetAtTime(0, t, tau);
-        oscs.forEach((o) => { try { o.stop(t + tau * 8); } catch (e) { /* already stopped */ } });
+        stopAt = stop;
+        oscs.forEach((o) => { try { o.stop(stop); } catch (e) { /* already stopped */ } });
+        if (t <= when) gone(); // never sounded
       },
     };
-    oscs[0].onended = () => { voices.delete(v); try { g.disconnect(); lp.disconnect(); } catch (e) { /* gone */ } };
+    const gone = () => { voices.delete(v); try { g.disconnect(); lp.disconnect(); } catch (e) { /* gone */ } };
+    oscs[0].onended = gone;
     return v;
   }
 

@@ -40,7 +40,7 @@
     { id: 'elise', title: '엘리제를 위하여', composer: '베토벤', level: 3, doodle: 'heart', color: '--c-si', score: true, length: '2:35' },
     { id: 'turkish', title: '터키 행진곡', composer: '모차르트', level: 3, doodle: 'note', color: '--c-re', score: true, length: '3:35' },
     // The piano part of 송어 ripples quickly under the tune: slower, and the piano kept soft.
-    { id: 'trout', title: '송어', composer: '슈베르트', level: 2, doodle: 'cloud', color: '--c-sol', score: true, length: '2:52', speed: 0.75, accomp: 0.4 },
+    { id: 'trout', title: '송어', composer: '슈베르트', level: 2, doodle: 'cloud', color: '--c-sol', score: true, length: '2:42', speed: 0.75, accomp: 0.45 },
     { id: 'danube', title: '아름답고 푸른 도나우', composer: '요한 슈트라우스', level: 2, doodle: 'cloud', color: '--c-sol', score: true, length: '0:39' },
     { id: 'mountain', title: '산속 마왕의 궁전', composer: '그리그', level: 3, doodle: 'moon', color: '--c-la', score: true, length: '2:36' },
     { id: 'entertainer', title: '엔터테이너', composer: '스콧 조플린', level: 3, doodle: 'note', color: '--c-mi', score: true, length: '4:12' },

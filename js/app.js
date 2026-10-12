@@ -24,6 +24,7 @@
 
   const state = {
     labels: LABEL_TEXT[store.get('labels')] ? store.get('labels') : 'solfege',
+    wide: store.get('keys') === 'wide', // more, narrower keys, like a real piano's right hand
     keys: {},          // midi -> key element
     fx: null,
     kbSize: [0, 0],
@@ -37,6 +38,7 @@
     page: 0,
     request: 0,      // bumps on every song choice and on 그만, so a late-loading song cannot start
     range: [60, 79],
+    shift: 0,          // octave move of the playing song on the keys (see fit)
   };
   // ?speed=8 in the address plays songs faster; only used for automated checks.
   const TEST_SPEED = Number(new URLSearchParams(location.search).get('speed')) || 1;
@@ -79,7 +81,8 @@
     // only stretches them. The crayon pictures are redrawn only when the size really changes.
     const kbW = kb.offsetWidth, kbH = kb.offsetHeight, built = state.built;
     state.kbSize = [kbW, kbH];
-    const count = kbW / 15 >= 62 ? 15 : 12; // C4–C6 on wide screens, C4–G5 on phones
+    // From middle C up: big keys C4–G5 (C4–C6 on wide screens), or the wide keyboard C4–F6 (C4–C7).
+    const count = state.wide ? (kbW / 22 >= 40 ? 22 : 18) : (kbW / 15 >= 62 ? 15 : 12);
     if (!built || count !== built.count || Math.abs(kbW - built.W) > built.W * 0.1 || Math.abs(kbH - built.H) > built.H * 0.25) {
       buildKeyboard(kbW, kbH, count);
     }
@@ -113,6 +116,7 @@
     const pct = (v) => (v * 100).toFixed(4) + '%';
     state.dotSize = dotSize;
     state.range = [whites[0], whites[whites.length - 1]];
+    if (state.song) state.shift = songShift(state.song);
 
     whites.forEach((m, i) => {
       const col = noteColor(m);
@@ -179,6 +183,15 @@
     });
     if (state.mode !== 'free') setRibbon(state.ribbonAt);
     $('btn-labels').textContent = LABEL_TEXT[state.labels];
+  }
+  const KEYS_ICON = {
+    big: '<svg viewBox="0 0 28 22" width="28" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="2" y="2" width="24" height="18" rx="2.5"/><path d="M10 2v18M18 2v18"/><path d="M10 2v9M18 2v9" stroke-width="5"/></svg>',
+    wide: '<svg viewBox="0 0 28 22" width="28" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="1.5" y="2" width="25" height="18" rx="2"/><path d="M5.7 2v18M9.8 2v18M14 2v18M18.2 2v18M22.3 2v18"/><path d="M5.7 2v9M9.8 2v9M18.2 2v9M22.3 2v9" stroke-width="3"/></svg>',
+  };
+  function renderKeysButton() {
+    const b = $('btn-keys');
+    b.innerHTML = KEYS_ICON[state.wide ? 'wide' : 'big'];
+    b.setAttribute('aria-label', state.wide ? '넓은 건반' : '큰 건반');
   }
 
   const lightOn = (k) => { k._n = (k._n || 0) + 1; k.classList.add('on'); };
@@ -286,8 +299,11 @@
   /* ---------- buttons ---------- */
   // Buttons act the moment the finger lifts. iPhones sometimes delay or drop the browser's own
   // 'click' (inside game frames, or when they wait to see if a tap is a double tap), which made
-  // buttons need two or three presses. A mouse or keyboard still works through 'click'.
-  let lastTap = 0;
+  // buttons need two or three presses. A keyboard still works through 'click'.
+  // The click that follows a tap is skipped: it can come more than a second late when the tap
+  // started heavy work (a new keyboard), so it is matched to the tap, not only timed.
+  let lastTap = 0, tapPending = false;
+  document.addEventListener('pointerdown', () => { tapPending = false; }, true);
   function onTap(area, fn) {
     let down = null;
     const clear = () => { if (down) down.b.classList.remove('pressed'); down = null; };
@@ -304,12 +320,13 @@
       clear();
       if (Math.hypot(e.clientX - x, e.clientY - y) > 30) return; // a slide, not a tap
       lastTap = performance.now();
+      tapPending = true;
       S.unlock();
       fn(b);
     });
     area.addEventListener('pointercancel', clear);
     area.addEventListener('click', (e) => {
-      if (performance.now() - lastTap < 800) return; // the tap already did it
+      if (tapPending || performance.now() - lastTap < 800) { tapPending = false; return; } // the tap already did it
       const b = e.target.closest && e.target.closest('button');
       if (b && area.contains(b)) fn(b);
     });
@@ -354,12 +371,24 @@
 
   // The tune of a song as MIDI note numbers.
   const melodyNotes = (song) => (song.score ? song.melody.map((n) => n[2]) : song.parsed.filter((n) => n.midi != null).map((n) => n.midi));
-  // Notes above or below the keys on screen are shown an octave or two closer, on the same note name.
+  // Where a note of the playing song shows on the keys. First the whole song moves by the octave
+  // that keeps the most notes on screen, so the tune keeps its shape; a note still outside then
+  // moves an octave or two closer, on the same note name. 듣기 still sounds at the real pitch.
   function fit(m) {
     const [lo, hi] = state.range;
+    m += state.shift;
     while (m > hi) m -= 12;
     while (m < lo) m += 12;
     return m;
+  }
+  function songShift(song) {
+    const [lo, hi] = state.range;
+    let best = 0, fewest = Infinity;
+    for (const by of [0, -12, 12, -24, 24]) {
+      const outside = melodyNotes(song).filter((m) => m + by < lo || m + by > hi).length;
+      if (outside < fewest) { best = by; fewest = outside; }
+    }
+    return best;
   }
 
   // Whole pieces keep their notes in songs/<id>.js; load that file the first time the song is chosen.
@@ -398,6 +427,7 @@
     stopSong();
     state.mode = 'listen';
     state.song = song;
+    state.shift = songShift(song);
     showSongBar(song, song.jazz ? '재즈로 듣기' : '듣기');
     // The song runs on the wall clock, not the sound card's clock: if a phone pauses its sound
     // (another app, the lock screen), the keys keep moving and the song still ends.
@@ -428,9 +458,24 @@
   function scoreEvents(song) {
     // song.speed slows a piece down (below 1) and song.accomp sets how loud the other hand plays.
     const vel = (v, k) => (0.35 + 0.65 * (v / 127)) * k, sp = 1000 * (song.speed || 1), acc = song.accomp || 0.85;
+    const mel = song.melody, back = song.accompaniment;
+    const first = Math.min(mel[0][0], back.length ? back[0][0] : Infinity); // no silence before the first note
+    // While the tune rests (an introduction, a passage for the other hand), the keys show the top
+    // note of the accompaniment instead, so something keeps moving.
+    const rests = [];
+    let end = -Infinity;
+    for (const [at, len] of mel) {
+      if (at - end > 600) rests.push([end, at]);
+      end = Math.max(end, at + len);
+    }
+    rests.push([end, Infinity]);
+    const resting = (t) => rests.some(([a, b]) => t >= a && t < b);
+    const top = new Map(); // start time -> index of the highest accompaniment note starting then
+    back.forEach(([at, , midi], j) => { if (resting(at) && !(top.has(at) && back[top.get(at)][2] >= midi)) top.set(at, j); });
+    const shown = new Set(top.values());
     return [
-      ...song.melody.map(([at, len, midi, v], i) => ({ at: at / sp, len: len / sp, midi, vel: vel(v, 1), kind: 'melody', i })),
-      ...song.accompaniment.map(([at, len, midi, v]) => ({ at: at / sp, len: len / sp, midi, vel: vel(v, acc), kind: 'back' })),
+      ...mel.map(([at, len, midi, v], i) => ({ at: (at - first) / sp, len: len / sp, midi, vel: vel(v, 1), kind: 'melody', i })),
+      ...back.map(([at, len, midi, v], j) => ({ at: (at - first) / sp, len: len / sp, midi, vel: vel(v, acc), kind: shown.has(j) ? 'fill' : 'back' })),
     ];
   }
   function tuneEvents(song) {
@@ -495,6 +540,7 @@
     stopSong();
     state.mode = 'follow';
     state.song = song;
+    state.shift = songShift(song);
     showSongBar(song, '따라치기');
     state.follow = { notes: melodyNotes(song), i: 0 };
     showHint();
@@ -549,6 +595,7 @@
     if (state.mode !== 'free') S.stopAll();
     state.mode = 'free';
     state.song = null;
+    state.shift = 0;
     hideSongBar();
   }
 
@@ -719,7 +766,13 @@
   onTap($('bar-free'), (b) => {
     if (b.id === 'btn-songs') openMenu();
     else if (b.id === 'btn-full') { if (isFullscreen()) exitFullscreen(); else enterFullscreen(); }
-    else if (b.id === 'btn-labels') {
+    else if (b.id === 'btn-keys') {
+      state.wide = !state.wide;
+      store.set('keys', state.wide ? 'wide' : 'big');
+      renderKeysButton();
+      layout();
+      toast(state.wide ? '넓은 건반: 진짜 피아노처럼 오른손 건반이 많아요' : '큰 건반: 건반이 크고 누르기 쉬워요', 2500);
+    } else if (b.id === 'btn-labels') {
       const order = ['solfege', 'letter', 'none'];
       state.labels = order[(order.indexOf(state.labels) + 1) % order.length];
       store.set('labels', state.labels);
@@ -772,11 +825,12 @@
   buildMenu();
   layout();
   renderLabels();
+  renderKeysButton();
 
   // Fetch the handwriting font's Korean letters for every screen now, not on the first visit
   // to each screen (the font comes in many small pieces, one per group of letters).
   if (document.fonts && document.fonts.load) {
-    const text = stage.textContent + '끝까지다쳤어요잘들었어요이제따라쳐볼까요한번더다른노래건반놀이재즈로듣기참잘했어요';
+    const text = stage.textContent + '끝까지다쳤어요잘들었어요이제따라쳐볼까요한번더다른노래건반놀이재즈로듣기참잘했어요넓은큰진짜피아노처럼오른손이많아요누르기쉬워요';
     document.fonts.load('24px Jua', text).catch(() => {});
   }
 })();
