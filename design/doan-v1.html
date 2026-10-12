@@ -122,6 +122,10 @@ body {
   border-radius: 47% 53% 50% 50% / 52% 48% 52% 48%;
 }
 .key.on { transform: translateY(4px) scaleY(.985); filter: brightness(1.05) saturate(1.4); }
+.key > canvas.glow { opacity: 0; transition: opacity .12s ease; }
+.key.on > canvas.glow { opacity: .9; }
+.key.hint:not(.on) > canvas.glow { animation: hintGlow 1s ease-in-out infinite; }
+@keyframes hintGlow { 0%, 100% { opacity: .2; } 50% { opacity: .6; } }
 .key .ring { position: absolute; left: -8px; top: -8px; width: calc(100% + 16px); height: calc(100% + 16px); pointer-events: none; animation: hintPulse 1s ease-in-out infinite; }
 .key .marker { position: absolute; left: 50%; bottom: 24%; width: 46px; height: 46px; margin-left: -23px; pointer-events: none; animation: bounce .7s ease-in-out infinite alternate; }
 .kb .rail, .mini .rail { position: absolute; left: 0; top: -7px; width: 100%; height: 14px; z-index: 3; pointer-events: none; }
@@ -205,9 +209,18 @@ body {
 .opt .row img { width: 44px; height: 44px; }
 .opt .row.emoji { font-size: 40px; line-height: 1.2; gap: 4px; }
 .opt p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+.opt.picked { border-color: color-mix(in srgb, var(--c-mi) 45%, var(--ink)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-mi) 70%, var(--c-card)); }
+.opt:not(.picked) { opacity: .72; }
+.chip {
+  margin-left: auto; padding: 2px 10px 0; white-space: nowrap;
+  font-family: var(--font-hand); font-weight: 700; font-size: 17px; line-height: 1.4; color: var(--ink);
+  background: var(--crayon-tex) 0 0 / 120px 120px, var(--c-fa);
+  border-radius: 12px 16px 12px 14px;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .key .marker, .key .ring { animation: none; }
+  .key .marker, .key .ring, .key.hint:not(.on) > canvas.glow { animation: none; }
+  .key.hint:not(.on) > canvas.glow { opacity: .4; }
   .fx img.fly { animation-duration: .01s; }
   .track, .dot { transition: none; }
 }
@@ -215,7 +228,7 @@ body {
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">도안 1차</p>
+    <p class="eyebrow">도안 2차 · 크레용 손그림과 하얀 건반</p>
     <h1><img data-spr="teddy" data-size="80" data-seed="2" alt=""><span class="logo" data-logo></span><img data-spr="heart" data-size="44" data-seed="3" alt=""></h1>
     <p class="lede">아이들이 핸드폰을 옆으로 눕혀서 치는 피아노예요. 아래 그림은 실제 화면을 줄여서 그린 도안이에요. 핸드폰을 가로로 돌리면 더 크게 보여요. 1번, 3번 화면과 맨 아래 작은 건반은 눌러 보면 소리가 나요.</p>
   </header>
@@ -225,7 +238,7 @@ body {
       <span class="num" style="--nc: var(--c-do)">1</span>
       <div>
         <h2>기본 화면 <span class="try">눌러 보세요</span></h2>
-        <p>건반이 화면을 거의 다 채워요. 위쪽 줄에는 노래 버튼, 도레미 이름표 버튼, 전체 화면 버튼만 둬요. 건반을 누르면 하트, 별, 꽃, 음표가 퐁퐁 올라가요.</p>
+        <p>건반이 화면을 거의 다 채워요. 위쪽 줄에는 노래 버튼, 도레미 이름표 버튼, 전체 화면 버튼만 둬요. 건반을 누르면 그 음의 색으로 크레파스가 칠해지고, 하트, 별, 꽃, 음표가 퐁퐁 올라가요.</p>
       </div>
     </div>
     <div class="device"><div class="screen"><div class="stage" data-build="main"></div></div></div>
@@ -265,13 +278,13 @@ body {
   </section>
 
   <section class="choices">
-    <h2>골라 주세요</h2>
-    <p>마음에 드는 쪽을 알려 주시면 그쪽으로 다듬을게요. 섞어도 돼요.</p>
+    <h2>고른 것</h2>
+    <p>꾸미기는 A 크레용 손그림, 건반은 B 하얀 건반으로 정했어요. 비교해 볼 수 있게 다른 쪽도 남겨 뒀어요.</p>
 
     <h3>꾸미기 그림</h3>
     <div class="pair">
-      <article class="opt">
-        <div class="opt-head"><span class="tag">A</span><h4>크레용 손그림</h4></div>
+      <article class="opt picked">
+        <div class="opt-head"><span class="tag">A</span><h4>크레용 손그림</h4><span class="chip">골랐어요</span></div>
         <div class="row">
           <img data-spr="teddy" data-size="44" data-seed="2" alt="곰돌이">
           <img data-spr="bunny" data-size="44" data-seed="4" alt="토끼">
@@ -296,12 +309,12 @@ body {
       <article class="opt">
         <div class="opt-head"><span class="tag">A</span><h4>무지개 파스텔 건반</h4></div>
         <div class="mini" data-mini="rainbow"></div>
-        <p>음마다 색이 정해져 있어서 따라치기 띠의 색과 바로 짝이 맞아요. 위 도안은 이쪽으로 그렸어요.</p>
+        <p>음마다 색이 정해져 있어서 건반 전체가 알록달록해요.</p>
       </article>
-      <article class="opt">
-        <div class="opt-head"><span class="tag">B</span><h4>하얀 건반과 색깔 동그라미</h4></div>
+      <article class="opt picked">
+        <div class="opt-head"><span class="tag">B</span><h4>하얀 건반과 색깔 동그라미</h4><span class="chip">골랐어요</span></div>
         <div class="mini" data-mini="plain"></div>
-        <p>진짜 피아노처럼 하얗고, 이름표 동그라미에만 색이 들어가요.</p>
+        <p>진짜 피아노처럼 하얗고, 이름표 동그라미에만 색이 들어가요. 누르면 그 음의 색으로 칠해져요. 위 도안은 이쪽으로 그렸어요.</p>
       </article>
     </div>
   </section>
@@ -779,6 +792,11 @@ body {
       el.style.left = i * kw + 'px'; el.style.width = kw + 'px';
       const face = drawKey(kw, H, { seed: m * 7 + seed, fill: plain ? '#fffdf8' : col, edge: plain ? shade(col, -0.2) : shade(col, -0.35) });
       face.className = 'face'; el.appendChild(face);
+      if (plain) {
+        // A colored copy of the key that fades in while it is pressed.
+        const glow = drawKey(kw, H, { seed: m * 7 + seed + 1, fill: col, edge: shade(col, -0.35) });
+        glow.className = 'face glow'; el.appendChild(glow);
+      }
       if (o.labels !== false) {
         const s = document.createElement('span');
         s.className = plain ? 'lbl dotlbl' : 'lbl';
@@ -884,7 +902,7 @@ body {
       <div class="kb"></div>`;
     hydrate(stage); fillLogos(stage);
     const kb = stage.querySelector('.kb');
-    const keys = buildKeyboard(kb, { whites: 12, seed });
+    const keys = buildKeyboard(kb, { whites: 12, seed, style: 'plain' });
     pressed.forEach((m) => keys[m] && keys[m].classList.add('on'));
     if (frozen && keys[64]) {
       const fx = kb.querySelector('.fx'), k = keys[64];
@@ -943,7 +961,7 @@ body {
       <div class="kb"></div>`;
     hydrate(stage);
     const kb = stage.querySelector('.kb');
-    const keys = buildKeyboard(kb, { whites: 12, seed: 3 });
+    const keys = buildKeyboard(kb, { whites: 12, seed: 3, style: 'plain' });
     const track = stage.querySelector('.track');
     TWINKLE.forEach((m) => {
       const d = document.createElement('span');
