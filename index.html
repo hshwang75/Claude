@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>크레용 피아노</title>
+<meta name="description" content="아이들을 위한 크레용 그림 피아노. 건반을 눌러 연주하고, 유명한 클래식 곡을 듣고 따라 쳐 보세요.">
+<meta name="theme-color" content="#fff8ec">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="크레용 피아노">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<!-- app:head -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<!-- /app:head -->
+</head>
+<body>
+<!-- app:body -->
+<div id="stage">
+  <header id="topbar">
+    <div class="bar" id="bar-free">
+      <button id="btn-songs" class="cbtn" type="button" style="--bg: var(--c-do)"><img data-doodle="note" data-size="24" data-col="--c-black" alt="">노래</button>
+      <div class="logo-wrap"><img data-doodle="teddy" data-size="48" data-seed="2" alt=""><span class="logo" data-logo></span><img data-doodle="heart" data-size="26" data-seed="3" alt=""></div>
+      <div class="spacer"></div>
+      <button id="btn-labels" class="cbtn" type="button" style="--bg: var(--c-fa)">도레미</button>
+      <button id="btn-full" class="cbtn sq" type="button" style="--bg: var(--c-sol)" aria-label="전체 화면" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.5C4 4.7 4.7 4 5.5 4H9M15 4h3.5c.8 0 1.5.7 1.5 1.5V9M20 15v3.5c0 .8-.7 1.5-1.5 1.5H15M9 20H5.5C4.7 20 4 19.3 4 18.5V15"/></svg>
+      </button>
+      <img class="deco" data-doodle="flower" data-size="22" data-seed="4" alt="" style="left: 19%; top: 8px">
+      <img class="deco" data-doodle="star" data-size="16" data-seed="5" alt="" style="left: 24%; top: 40px">
+      <img class="deco" data-doodle="flower" data-size="18" data-seed="6" data-col="#b9c4ff" alt="" style="left: 72%; top: 8px">
+      <img class="deco" data-doodle="heart" data-size="14" data-seed="7" alt="" style="left: 75.5%; top: 40px">
+    </div>
+    <div class="bar" id="bar-song" hidden>
+      <button id="btn-stop" class="cbtn sm" type="button" style="--bg: var(--c-do)"><span class="stop-ic"></span>그만</button>
+      <div class="song-name"><img id="song-doodle" alt=""><div><b id="song-title"></b><small id="song-mode"></small></div></div>
+      <div class="ribbon"><div class="track" id="ribbon"></div></div>
+    </div>
+  </header>
+
+  <main id="kb" class="kb" aria-label="피아노 건반"></main>
+
+  <section id="menu" class="overlay" hidden aria-label="노래 고르기">
+    <div class="panel">
+      <div class="bar static">
+        <button id="btn-menu-close" class="cbtn sm" type="button" style="--bg: var(--c-la)">✕ 닫기</button>
+        <div class="logo-wrap"><img data-doodle="teddy" data-size="44" data-seed="8" alt=""><span class="title">어떤 노래를 칠까요?</span><img data-doodle="flower" data-size="26" data-seed="9" alt=""></div>
+      </div>
+      <div class="menu-grid scroll" id="song-list"></div>
+    </div>
+  </section>
+
+  <section id="end" class="overlay veil" hidden aria-live="polite">
+    <div class="panel end-panel">
+      <div class="confetti" id="confetti"></div>
+      <p class="end-msg" id="end-msg"></p>
+      <div class="end-row">
+        <img data-doodle="teddy" data-size="120" data-seed="11" alt="">
+        <span class="stamp-slot" id="stamp-slot"></span>
+        <img data-doodle="bunny" data-size="112" data-seed="12" alt="">
+      </div>
+      <div class="end-acts" id="end-acts"></div>
+    </div>
+  </section>
+
+  <section id="start" class="overlay start" aria-label="시작">
+    <div class="panel start-panel">
+      <img class="deco" data-doodle="rainbow" data-size="90" data-seed="3" alt="" style="left: 5%; top: 9%">
+      <img class="deco" data-doodle="cloud" data-size="64" data-seed="4" alt="" style="right: 7%; top: 8%">
+      <img class="deco" data-doodle="flower" data-size="34" data-seed="5" alt="" style="left: 9%; bottom: 14%">
+      <img class="deco" data-doodle="heart" data-size="28" data-seed="6" alt="" style="left: 17%; bottom: 26%">
+      <img class="deco" data-doodle="star" data-size="30" data-seed="7" alt="" style="right: 12%; bottom: 22%">
+      <img class="deco" data-doodle="flower" data-size="26" data-seed="8" data-col="#b9c4ff" alt="" style="right: 20%; bottom: 10%">
+      <div class="start-art">
+        <img data-doodle="teddy" data-size="110" data-seed="2" alt="">
+        <h1 class="logo big" data-logo></h1>
+        <img data-doodle="bunny" data-size="100" data-seed="4" alt="">
+      </div>
+      <p class="start-text">건반을 눌러서 연주해요. 노래 버튼을 누르면 노래를 듣고 따라 칠 수 있어요.</p>
+      <button id="btn-start" class="cbtn big" type="button" style="--bg: var(--c-mi)">▶ 시작하기</button>
+      <p class="credit">피아노 소리: Salamander Grand Piano (Alexander Holm, CC BY 3.0)</p>
+    </div>
+  </section>
+</div>
+<div id="rotate-hint" hidden>
+  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M20.5 14.5a8.5 8.5 0 0 1-6 6M19 21h-4.5v-3.5"/></svg>
+  휴대폰을 옆으로 눕혀 주세요
+</div>
+<script src="js/crayon.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/songs.js"></script>
+<script src="js/app.js"></script>
+<!-- /app:body -->
+</body>
+</html>
