@@ -1,10 +1,6 @@
 /* Layout: one landscape "drawing paper" stage. A thin top bar, the crayon keyboard filling
    the rest, and full-stage overlays for the start screen, song menu and the end screen.
    On a phone held upright the whole stage is turned sideways so it still reads as landscape. */
-
-/* Jua (SIL Open Font License, see fonts/OFL.txt), cut down to the letters the app uses by
-   scripts/build.py font. It comes with the app, so it shows even where Google Fonts is blocked. */
-@font-face { font-family: 'Jua'; src: url('../fonts/jua.woff2') format('woff2'); font-display: swap; }
 :root {
   --paper: #fff8ec;
   --ink: #4f3f5c;
@@ -19,7 +15,8 @@
   --c-black: #8a79b6;
   --c-stamp: #ef5470;
   --c-card: #fffaf0;
-  /* Jua: a round, friendly Korean typeface that is easy for children to read. It has one weight. */
+  /* Jua: a round, friendly Korean typeface that is easy for children to read. It has one weight.
+     It comes with the app in fonts/jua.js. */
   --font-hand: 'Jua', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --paper-tex: none;
   --wax: none;
@@ -55,14 +52,18 @@ img { -webkit-user-drag: none; }
 }
 
 /* ---------- top bar ---------- */
+/* The bar and the overlay panels are laid out at one size (812 x 375 and up) and scaled to the
+   screen with a transform. Not with CSS zoom: iPhone Safari, turned sideways, drew zoomed buttons
+   in one place and looked for touches on them a little lower. */
 #topbar { position: relative; flex: 0 0 calc(66px * var(--z)); z-index: 3; }
 .bar {
-  position: absolute; left: 0; top: 0; width: var(--lw); height: 66px; zoom: var(--z);
+  position: absolute; left: 0; top: 0; width: var(--lw); height: 66px;
+  transform: scale(var(--z)); transform-origin: 0 0;
   /* iPhones hold back touches that start close to the screen edge (they might be a swipe),
      so the buttons sit well inside it */
   display: flex; align-items: center; gap: 12px; padding: 4px 32px 0;
 }
-.bar.static { position: relative; flex: 0 0 66px; width: auto; zoom: 1; }
+.bar.static { position: relative; flex: 0 0 66px; width: auto; transform: none; }
 .spacer { flex: 1; }
 .logo-wrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 6px; white-space: nowrap; pointer-events: none; }
 .logo-wrap .title { font-weight: 700; font-size: 31px; }
@@ -90,6 +91,10 @@ img { -webkit-user-drag: none; }
   cursor: pointer; touch-action: manipulation;
 }
 .cbtn:active, .cbtn.pressed { transform: translateY(3px); box-shadow: 0 1px 0 var(--edge); }
+/* iPhone Safari turned sideways inside a full-screen game frame (itch.io) reports every touch
+   a little above the finger, so pressing the middle of a button missed it. There, each button
+   also takes touches from the strip just above it (app.js sets .reach-up). */
+.reach-up .cbtn::before { content: ''; position: absolute; left: 0; right: 0; top: -36px; bottom: 0; }
 .cbtn:focus-visible { outline: 3px solid var(--c-sol); outline-offset: 3px; }
 .cbtn img { width: 24px; height: 24px; }
 .cbtn svg { flex: 0 0 auto; }
@@ -156,13 +161,13 @@ img { -webkit-user-drag: none; }
 
 /* ---------- overlays ---------- */
 .overlay {
-  position: absolute; inset: 0; z-index: 10;
+  position: absolute; inset: 0; z-index: 10; overflow: hidden;
   padding: var(--st) var(--sr) var(--sb) var(--sl);
   background: var(--paper-tex) 0 0 / 200px 200px, var(--paper);
 }
 .overlay.veil { background: color-mix(in srgb, var(--paper) 82%, transparent); }
 .overlay.closed { visibility: hidden; pointer-events: none; }
-.panel { position: relative; width: var(--lw); height: var(--lh); zoom: var(--z); display: flex; flex-direction: column; }
+.panel { position: relative; width: var(--lw); height: var(--lh); transform: scale(var(--z)); transform-origin: 0 0; display: flex; flex-direction: column; }
 
 /* song menu */
 .song-list { position: relative; flex: 1; min-height: 0; overflow: hidden; }

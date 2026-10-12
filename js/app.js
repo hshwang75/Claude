@@ -75,6 +75,7 @@
     // its own bars: taps there never reach the page. On itch.io the game fills the screen, so the
     // top buttons sat in that band and worked only when pressed near their lower edge.
     if (IOS_BROWSER && !portrait) s.t += 44;
+    root.classList.toggle('reach-up', IOS_BROWSER && !portrait && window.top !== window.self);
     const innerW = W - s.l - s.r, innerH = H - s.t - s.b;
     const z = Math.min(1.6, Math.max(0.72, Math.min(innerW / 812, innerH / 375)));
     const set = (k, v) => root.style.setProperty(k, v);
@@ -896,6 +897,9 @@
   layout();
   renderLabels();
   renderKeysButton();
+  // Which build this is, to tell whether a game site already serves the newest one.
+  const version = document.querySelector('meta[name="crayon-version"]');
+  document.querySelector('#start .credit').textContent += ` · 버전 ${version ? version.content : '개발판'}`;
 
   // Fetch the handwriting font's Korean letters for every screen now, not on the first visit
   // to each screen (the font comes in many small pieces, one per group of letters).

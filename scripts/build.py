@@ -8,7 +8,7 @@
                                           -> page body for a claude.ai Artifact preview
                                              (--debug shows where each touch lands)
   python3 scripts/build.py font Jua-Regular.ttf
-                                          -> fonts/jua.woff2, the font cut down to the letters the
+                                          -> fonts/jua.js, the font cut down to the letters the
                                              app shows; run again after adding Korean text
 
 js/songs-family.js holds songs that are still under copyright. It is kept out of git
@@ -19,6 +19,7 @@ import json
 import re
 import sys
 import zipfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -43,8 +44,11 @@ FAMILY_TAG = '<script src="js/songs-family.js"></script>\n'
 
 
 def index_html(family: bool) -> str:
-    """index.html, with songs-family.js loaded before songs.js for the family build."""
+    """index.html, with songs-family.js loaded before songs.js for the family build, and the build
+    time (Korean time) as the version shown on the start screen."""
     html = (ROOT / "index.html").read_text(encoding="utf-8")
+    version = datetime.now(timezone(timedelta(hours=9))).strftime("%m%d-%H%M")
+    html = html.replace("<!-- app:head -->", f'<!-- app:head -->\n<meta name="crayon-version" content="{version}">', 1)
     if family:
         assert SONGS_TAG in html, "songs.js script tag not found in index.html"
         html = html.replace(SONGS_TAG, FAMILY_TAG + SONGS_TAG)
@@ -81,12 +85,13 @@ def build_page(dest: Path, debug: bool = False) -> Path:
     return dest
 
 
-FONT_OUT = ROOT / "fonts" / "jua.woff2"
+FONT_OUT = ROOT / "fonts" / "jua.js"
 
 
 def build_font(src: Path) -> Path:
-    """The app carries its font, so it shows even where Google Fonts is blocked. Korean fonts are
-    large, so keep only the letters found in index.html and js/."""
+    """The app carries its font inside a script, so it shows wherever the app runs: Google Fonts
+    can be blocked, and a game site's frame may refuse font files. Korean fonts are large, so keep
+    only the letters found in index.html and js/."""
     from fontTools import subset  # pip install fonttools brotli
     text = "".join(p.read_text(encoding="utf-8") for p in [ROOT / "index.html", *sorted((ROOT / "js").glob("*.js"))])
     chars = {c for c in text if ord(c) > 0x7f} | {chr(c) for c in range(0x20, 0x7f)}
@@ -99,7 +104,20 @@ def build_font(src: Path) -> Path:
     sub.populate(text="".join(sorted(chars)))
     sub.subset(font)
     FONT_OUT.parent.mkdir(exist_ok=True)
-    subset.save_font(font, str(FONT_OUT), opts)
+    woff2 = FONT_OUT.with_suffix(".woff2")
+    subset.save_font(font, str(woff2), opts)
+    data = base64.b64encode(woff2.read_bytes()).decode("ascii")
+    woff2.unlink()
+    FONT_OUT.write_text(
+        "/* Jua (SIL Open Font License, fonts/OFL.txt), cut down to the letters the app shows.\n"
+        "   Made by scripts/build.py font. */\n"
+        "(function () {\n"
+        "  try {\n"
+        f"    const bytes = Uint8Array.from(atob('{data}'), (c) => c.charCodeAt(0));\n"
+        "    document.fonts.add(new FontFace('Jua', bytes));\n"
+        "  } catch (e) { /* the phone's own font shows instead */ }\n"
+        "})();\n",
+        encoding="ascii")
     return FONT_OUT
 
 
