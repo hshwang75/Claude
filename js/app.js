@@ -261,7 +261,7 @@
     $('song-title').textContent = song.title;
     $('song-mode').textContent = modeText;
     const im = $('song-doodle');
-    im.src = C.doodleURL(song.doodle, 34, 20);
+    im.src = C.doodleURL(song.doodle, 34, 20, song.doodleCol || null);
     const track = $('ribbon');
     track.textContent = '';
     state.ribbonNotes = song.parsed.filter((n) => n.midi != null).map((n) => n.midi);
@@ -292,15 +292,28 @@
     stopSong();
     state.mode = 'listen';
     state.song = song;
-    showSongBar(song, '듣기');
-    const spb = 60 / song.bpm;
-    let t = S.now() + 0.5, idx = 0;
-    const events = [];
+    showSongBar(song, song.jazz ? '재즈로 듣기' : '듣기');
+    const J = song.jazz;
+    const list = [];
+    let beat = 0, idx = 0;
     for (const n of song.parsed) {
-      if (n.midi != null) events.push({ midi: n.midi, t, dur: n.beats * spb, i: idx++ });
-      t += n.beats * spb;
+      if (n.midi != null) list.push({ beat, dur: n.beats, midi: n.midi, vel: J ? 0.95 : 0.85, kind: 'melody', i: idx++ });
+      beat += n.beats;
     }
-    const L = state.listen = { events, next: 0, end: t, timeouts: [], lit: new Map(), timer: 0 };
+    if (J) list.push(...J.events);
+    // Swing: the second half of each beat is played late, like the last note of a triplet.
+    const swing = (b) => {
+      const whole = Math.floor(b + 1e-9), f = b - whole;
+      return whole + (f <= 0.5 ? (f * 4) / 3 : 2 / 3 + ((f - 0.5) * 2) / 3);
+    };
+    const spb = 60 / song.bpm, t0 = S.now() + 0.5;
+    const events = list.map((e) => {
+      const start = J && J.swing && !e.straight ? swing(e.beat) : e.beat;
+      const stop = J && J.swing && !e.straight ? swing(e.beat + e.dur) : e.beat + e.dur;
+      return { ...e, t: t0 + start * spb, dur: (stop - start) * spb };
+    }).sort((a, b) => a.t - b.t);
+    const end = Math.max(...events.map((e) => e.t + e.dur));
+    const L = state.listen = { events, next: 0, end, timeouts: [], lit: new Map(), timer: 0 };
     const tick = () => {
       if (state.listen !== L) return;
       const now = S.now();
@@ -314,15 +327,16 @@
     tick();
   }
   function schedule(L, ev, now) {
-    const v = S.play(ev.midi, { when: ev.t, velocity: 0.85 });
+    const v = S.play(ev.midi, { when: ev.t, velocity: ev.vel });
     v.release(ev.t + ev.dur * 0.95);
+    if (ev.kind === 'back') return; // chords and bass only sound; the keys show the melody
     const onAt = Math.max(0, (ev.t - now) * 1000);
     const offAt = Math.max(onAt + 60, (ev.t + ev.dur * 0.8 - now) * 1000);
     L.timeouts.push(setTimeout(() => {
       if (state.listen !== L) return;
       const k = state.keys[ev.midi];
       if (k) { lightOn(k); L.lit.set(k, (L.lit.get(k) || 0) + 1); burst(k, 1); }
-      setRibbon(ev.i);
+      if (ev.kind === 'melody') setRibbon(ev.i);
     }, onAt));
     L.timeouts.push(setTimeout(() => {
       if (state.listen !== L) return;
@@ -418,7 +432,7 @@
     list.classList.toggle('cols-4', SONGS.length > 6);
     list.innerHTML = SONGS.map((s, i) => `
       <div class="card" style="--cc: var(${s.color})">
-        <img class="ic" data-doodle="${s.doodle}" data-size="58" data-seed="${i + 20}" alt="">
+        <img class="ic" data-doodle="${s.doodle}" data-size="58" data-seed="${i + 20}"${s.doodleCol ? ` data-col="${s.doodleCol}"` : ''} alt="">
         <h3 class="t">${s.title}</h3>
         <div class="sub">
           <span class="c">${s.composer}</span>

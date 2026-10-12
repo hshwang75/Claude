@@ -5,9 +5,12 @@
 (function () {
   'use strict';
 
-  const SAMPLES = { A3: 57, C4: 60, Ds4: 63, Fs4: 66, A4: 69, C5: 72, Ds5: 75, Fs5: 78, A5: 81, C6: 84 };
+  const SAMPLES = {
+    Ds2: 39, Fs2: 42, A2: 45, C3: 48, Ds3: 51, Fs3: 54, // low notes for the jazz bass line
+    A3: 57, C4: 60, Ds4: 63, Fs4: 66, A4: 69, C5: 72, Ds5: 75, Fs5: 78, A5: 81, C6: 84,
+  };
   const BASE = 'audio/piano/';
-  const MAX_VOICES = 24;
+  const MAX_VOICES = 40;
   const NOOP = { release() {} };
 
   let ctx = null, out = null;
