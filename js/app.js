@@ -51,8 +51,9 @@
   C.fillLogos(document);
 
   /* ---------- layout: always landscape ---------- */
-  // Safari on an iPhone or iPad, not a home-screen app (which has no browser bars).
-  const IOS_BROWSER = (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document)) && !navigator.standalone;
+  // An iPhone or iPad, and whether the app runs inside another page's frame (itch.io).
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document);
+  const FRAMED = window.top !== window.self;
   const probe = document.createElement('div');
   probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
     'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
@@ -71,11 +72,13 @@
     const p = getComputedStyle(probe);
     const i = { t: parseFloat(p.paddingTop) || 0, r: parseFloat(p.paddingRight) || 0, b: parseFloat(p.paddingBottom) || 0, l: parseFloat(p.paddingLeft) || 0 };
     const s = portrait ? { l: i.t, r: i.b, t: i.r, b: i.l } : { ...i };
-    // With the iPhone itself turned sideways, Safari keeps a band along the top of the screen for
-    // its own bars: taps there never reach the page. On itch.io the game fills the screen, so the
-    // top buttons sat in that band and worked only when pressed near their lower edge.
-    if (IOS_BROWSER && !portrait) s.t += 44;
-    root.classList.toggle('reach-up', IOS_BROWSER && !portrait && window.top !== window.self);
+    // With the iPhone itself turned sideways, taps near the top of the screen get lost: Safari
+    // keeps a band there for its own bars, and inside a game site's frame (itch.io, in Safari or
+    // opened from a home-screen shortcut) touches are reported a little above the finger. Keep
+    // the buttons lower there, and let each button also take touches from just above it.
+    const sideways = IOS && !portrait;
+    if (sideways && (FRAMED || !navigator.standalone)) s.t += 44;
+    root.classList.toggle('reach-up', sideways && FRAMED);
     const innerW = W - s.l - s.r, innerH = H - s.t - s.b;
     const z = Math.min(1.6, Math.max(0.72, Math.min(innerW / 812, innerH / 375)));
     const set = (k, v) => root.style.setProperty(k, v);

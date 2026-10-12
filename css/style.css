@@ -91,9 +91,10 @@ img { -webkit-user-drag: none; }
   cursor: pointer; touch-action: manipulation;
 }
 .cbtn:active, .cbtn.pressed { transform: translateY(3px); box-shadow: 0 1px 0 var(--edge); }
-/* iPhone Safari turned sideways inside a full-screen game frame (itch.io) reports every touch
-   a little above the finger, so pressing the middle of a button missed it. There, each button
-   also takes touches from the strip just above it (app.js sets .reach-up). */
+/* An iPhone turned sideways, inside a game site's frame (itch.io, in Safari or from a home-screen
+   shortcut), reports every touch a little above the finger, so pressing the middle of a button
+   missed it. There, each button also takes touches from the strip just above it (app.js sets
+   .reach-up). */
 .reach-up .cbtn::before { content: ''; position: absolute; left: 0; right: 0; top: -36px; bottom: 0; }
 .cbtn:focus-visible { outline: 3px solid var(--c-sol); outline-offset: 3px; }
 .cbtn img { width: 24px; height: 24px; }
