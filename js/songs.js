@@ -31,7 +31,7 @@
               C5:2 A4:.5 F4:.5 | G4:2 E4:.5 C4:.5 | F4 G4 A4 | G4:2 C4:.5 C4:.5 |
               C5:2 A4:.5 F4:.5 | G4:2 E4:.5 C4:.5 | F4 E4 D4 | C4:3`,
     },
-    // Whole pieces made from Mutopia Project scores by scripts/import_scores.py.
+    // Whole pieces made from Mutopia Project scores and IMSLP files by scripts/import_scores.py.
     // The notes are in songs/<id>.js and load when the song is chosen. length is minutes:seconds.
     { id: 'farmer', title: '즐거운 농부', composer: '슈만', level: 2, doodle: 'sun', color: '--c-fa', score: true, length: '0:48' },
     { id: 'schubertlullaby', title: '슈베르트 자장가', composer: '슈베르트', level: 2, doodle: 'moon', color: '--c-si', score: true, length: '0:40' },
@@ -41,7 +41,7 @@
     { id: 'turkish', title: '터키 행진곡', composer: '모차르트', level: 3, doodle: 'note', color: '--c-re', score: true, length: '3:35' },
     // The piano part of 송어 ripples quickly under the tune: slower, and the piano kept soft.
     { id: 'trout', title: '송어', composer: '슈베르트', level: 2, doodle: 'cloud', color: '--c-sol', score: true, length: '2:42', speed: 0.75, accomp: 0.45 },
-    { id: 'danube', title: '아름답고 푸른 도나우', composer: '요한 슈트라우스', level: 2, doodle: 'cloud', color: '--c-sol', score: true, length: '0:39' },
+    { id: 'danube', title: '아름답고 푸른 도나우', composer: '요한 슈트라우스', level: 3, doodle: 'cloud', color: '--c-sol', score: true, length: '7:00', accomp: 0.75 },
     { id: 'mountain', title: '산속 마왕의 궁전', composer: '그리그', level: 3, doodle: 'moon', color: '--c-la', score: true, length: '2:36' },
     { id: 'entertainer', title: '엔터테이너', composer: '스콧 조플린', level: 3, doodle: 'note', color: '--c-mi', score: true, length: '4:12' },
     { id: 'puppy', title: '강아지 왈츠', composer: '쇼팽', level: 3, doodle: 'heart', color: '--c-do', score: true, length: '1:29' },

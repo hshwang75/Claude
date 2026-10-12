@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn Mutopia Project scores (LilyPond) into song data for the app.
+"""Turn Mutopia Project scores (LilyPond) and IMSLP MIDI files into song data for the app.
 
   python3 scripts/import_scores.py MUTOPIA_DIR [song-id ...]
 
@@ -7,7 +7,8 @@ MUTOPIA_DIR is a checkout of https://github.com/MutopiaProject/MutopiaProject.
 Needs `pip install lilypond mido`. For every song in PIECES below it:
   1. copies the score, updates its syntax with convert-ly,
   2. unfolds every repeat so the piece plays from beginning to end,
-  3. renders MIDI with LilyPond and reads the notes back,
+  3. renders MIDI with LilyPond and reads the notes back
+     (a piece with "imslp" instead of "path" downloads that IMSLP file, a MIDI, instead),
   4. picks the melody (the highest note of the melody staff at each moment),
   5. writes songs/<id>.js, which the app loads when the song is chosen.
 """
@@ -17,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.request
 from pathlib import Path
 
 import lilypond
@@ -28,14 +30,20 @@ BIN = Path(lilypond.executable()).parent
 
 # id: score path under ftp/, the MIDI track that carries the tune (1 = first staff), license, and
 # speed (1 = the tempo written in the score; scores without a tempo mark play at 60).
-# Optional: start (seconds; skip a long introduction, keeping the bar before the tune comes in) and
-# drop_short (seconds; leave out accompaniment notes shorter than this, for a calmer sound).
+# Optional: start (seconds; skip a long introduction, keeping the bar before the tune comes in),
+# drop_short (seconds; leave out accompaniment notes shorter than this, for a calmer sound),
+# tracks (keep only these MIDI tracks), tremolo (a tremolo in the tune counts as one long note) and
+# graces (grace notes stay out of the tune). melody can also list several tracks (see top_line).
 PIECES = {
     "elise": dict(path="BeethovenLv/WoO59/fur_Elise_WoO59/fur_Elise_WoO59.ly", melody=1, license="Public Domain"),
     "minuet": dict(path="BachJS/BWVAnh114/anna-magdalena-04/anna-magdalena-04.ly", melody=1, license="Public Domain", speed=0.85),
     "turkish": dict(path="MozartWA/KV331/KV331_3_RondoAllaTurca/KV331_3_RondoAllaTurca-lys/KV331_3_RondoAllaTurca.ly", melody=1, license="Public Domain", speed=2.0),
     "farmer": dict(path="SchumannR/O68/schumann-op68-10-gai-laboureur/schumann-op68-10-gai-laboureur.ly", melody=3, license="CC BY-SA 2.5"),
-    "danube": dict(path="StraussJJ/O314/blue_danube/blue_danube.ly", melody=1, license="CC BY-SA 4.0"),
+    # The whole waltz from Christian Mondrup's version for chorus and piano four hands (Werner Icking
+    # Music Collection). Only the two pianists are kept. The tune is the first pianist's: the famous
+    # opening (D D F# A A) is in the left hand and its answers in the right.
+    "danube": dict(imslp=148223, source="Christian Mondrup, Werner Icking Music Collection, via IMSLP",
+                   tracks=range(10, 22), melody=(10, 13), tremolo=True, graces=True, license="CC BY-NC-SA 3.0"),
     # 송어: without the quick rippling runs of the piano part, which sounded busy under the tune.
     "trout": dict(path="SchubertF/D550/forelle/forelle-lys/forelle.ly", melody=1, license="Public Domain", start=8.0, drop_short=0.15),
     "mountain": dict(path="GriegE/O46/Dans_l_antre_du_roi_de_la_montagne/Dans_l_antre_du_roi_de_la_montagne.ly", melody=1, license="Public Domain", speed=1.7),
@@ -116,6 +124,40 @@ def render_midi(mutopia: Path, rel: str, work: Path) -> list[Path]:
     return mids
 
 
+def download_imslp(index: int, work: Path) -> Path:
+    """An IMSLP file by its number (the #148223 on the work's page)."""
+    req = urllib.request.Request(f"https://imslp.org/wiki/Special:ImagefromIndex/{index}",
+                                 headers={"Cookie": "imslpdisclaimeraccepted=yes; redirectPassed=1",
+                                          "User-Agent": "crayon-piano import_scores.py"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        out = work / Path(r.url).name
+        out.write_bytes(r.read())
+    if not out.read_bytes().startswith(b"MThd"):
+        raise RuntimeError(f"IMSLP #{index} did not come back as a MIDI file")
+    return out
+
+
+def collapse_tremolo(mel, rest, min_run=6, short=0.2):
+    """Two notes taking quick turns (a tremolo) are one long note of the tune, on the upper note.
+    The quick notes still sound: they move to the accompaniment."""
+    out, i = [], 0
+    while i < len(mel):
+        j = i
+        while (j + 2 < len(mel) and mel[j + 2][2] == mel[j][2] != mel[j + 1][2]
+               and max(mel[j][1], mel[j + 1][1], mel[j + 2][1]) <= short):
+            j += 1
+        run = mel[i:j + 2]
+        if len(run) < min_run:
+            out.append(mel[i])
+            i += 1
+            continue
+        top = max(run[0][2], run[1][2])
+        out.append((run[0][0], run[-1][0] + run[-1][1] - run[0][0], top, max(n[3] for n in run), run[0][4]))
+        rest.extend(n for n in run if not (n[0] == run[0][0] and n[2] == top))
+        i = j + 2
+    return out
+
+
 def read_notes(mid_path: Path):
     """All notes as (start_s, dur_s, pitch, velocity, track), using the file's tempo changes."""
     mf = mido.MidiFile(mid_path)
@@ -171,13 +213,54 @@ def melody_of(notes, track):
     return mel
 
 
+def top_line(notes, tracks):
+    """The tune heard on top across several tracks: the highest note at each onset, unless a higher
+    note of these tracks is still sounding (then it is an inner voice)."""
+    groups = []
+    for n in (n for n in notes if n[4] in tracks):
+        if groups and n[0] - groups[-1][0][0] <= 0.03:
+            groups[-1].append(n)
+        else:
+            groups.append([n])
+    mel, held = [], []
+    for g in groups:
+        t, top = g[0][0], max(g, key=lambda x: x[2])
+        held = [h for h in held if h[0] + h[1] > t + 0.03]
+        if not any(h[2] > top[2] for h in held):
+            mel.append(top)
+        held.extend(g)
+    return mel
+
+
+def drop_graces(mel, rest, short=0.12):
+    """A very short note right before the next note of the tune is a grace note: it still sounds,
+    but is not a key to press."""
+    out = []
+    for i, n in enumerate(mel):
+        if n[1] < short and i + 1 < len(mel) and mel[i + 1][0] - n[0] < short:
+            rest.append(n)
+        else:
+            out.append(n)
+    return out
+
+
 def export(song_id: str, cfg: dict, mutopia: Path) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
-        mids = render_midi(mutopia, cfg["path"], Path(tmp))
-        notes, names = read_notes(mids[cfg.get("midi_index", 0)])
-    melody = set(map(id, melody_of(notes, cfg["melody"])))
+        if "imslp" in cfg:
+            notes, names = read_notes(download_imslp(cfg["imslp"], Path(tmp)))
+        else:
+            notes, names = read_notes(render_midi(mutopia, cfg["path"], Path(tmp))[cfg.get("midi_index", 0)])
+    if "tracks" in cfg:
+        notes = [n for n in notes if n[4] in cfg["tracks"]]
+    tune = top_line(notes, cfg["melody"]) if isinstance(cfg["melody"], tuple) else melody_of(notes, cfg["melody"])
+    melody = set(map(id, tune))
     mel = [n for n in notes if id(n) in melody]
     rest = [n for n in notes if id(n) not in melody]
+    if cfg.get("tremolo"):
+        mel = collapse_tremolo(mel, rest)
+    if cfg.get("graces"):
+        mel = drop_graces(mel, rest)
+    rest.sort()
     if cfg.get("drop_short"):
         rest = [n for n in rest if n[1] >= cfg["drop_short"]]
     if cfg.get("start"):
@@ -193,9 +276,12 @@ def export(song_id: str, cfg: dict, mutopia: Path) -> dict:
         "accompaniment": [[ms(n[0]), ms(n[1]), n[2], n[3]] for n in rest],
     }
     OUT.mkdir(exist_ok=True)
+    source = (f"IMSLP file #{cfg['imslp']} ({cfg['source']})" if "imslp" in cfg
+              else f"the Mutopia Project score ftp/{cfg['path']}")
+    link = "https://imslp.org" if "imslp" in cfg else "https://www.mutopiaproject.org"
     (OUT / f"{song_id}.js").write_text(
-        f"/* {song_id}: notes made from the Mutopia Project score ftp/{cfg['path']} ({cfg['license']})\n"
-        f"   by scripts/import_scores.py. https://www.mutopiaproject.org */\n"
+        f"/* {song_id}: notes made from {source} ({cfg['license']})\n"
+        f"   by scripts/import_scores.py. {link} */\n"
         f"(window.SONG_DATA = window.SONG_DATA || {{}})[{json.dumps(song_id)}] = {json.dumps(data, separators=(',', ':'))};\n",
         encoding="utf-8")
     end = max(n[0] + n[1] for n in notes) / speed

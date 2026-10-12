@@ -27,17 +27,19 @@
 
 • 건반을 누르면 그 음의 색으로 크레파스가 칠해지고 하트, 별, 꽃, 음표가 퐁퐁 올라가요.
 • 진짜 그랜드 피아노를 녹음한 소리가 나요.
-• 클래식 6곡을 듣고 따라 칠 수 있어요: 작은 별(모차르트), 꿈속의 고향(드보르자크), 환희의 송가(베토벤), 자장가(브람스), 미뉴에트(바흐), 엘리제를 위하여(베토벤)
+• 유명한 클래식 21곡을 처음부터 끝까지 듣고 따라 칠 수 있어요: 작은 별, 엘리제를 위하여, 터키 행진곡, 아름답고 푸른 도나우, 군대 행진곡, 송어, 엔터테이너 등
 • 따라치기에서는 칠 건반이 반짝이고, 끝까지 치면 "참 잘했어요" 도장이 찍혀요.
 • 건반 이름표를 도레미, CDE, 이름 없음 중에서 고를 수 있어요.
+• 크고 누르기 쉬운 건반과, 진짜 피아노 오른손처럼 넓은 건반 중에서 고를 수 있어요.
 
 휴대폰을 옆으로 눕혀서 쳐 주세요. 아이폰에서 소리가 안 나면 무음 모드를 꺼 주세요.
 컴퓨터에서는 키보드 A S D F G H J K L 로도 칠 수 있어요.
 
 ---
 
-Crayon Piano: a hand-drawn crayon piano for kids. Tap the keys to color them in, listen to six classical pieces, and play along as the next key lights up.
+Crayon Piano: a hand-drawn crayon piano for kids. Tap the keys to color them in, listen to 21 complete classical pieces, and play along as the next key lights up.
 
 피아노 소리 / Piano sound: Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0)
 글꼴 / Font: Jua (SIL Open Font License)
+악보 / Scores: Mutopia Project, IMSLP — 아름답고 푸른 도나우 / The Blue Danube: Christian Mondrup, Werner Icking Music Collection (CC BY-NC-SA 3.0)
 ```
