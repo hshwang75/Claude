@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ["index.html", "manifest.webmanifest"]
-DIRS = ["css", "js", "audio", "icons"]
+DIRS = ["css", "js", "audio", "icons", "songs"]
 SAMPLES_JS = ROOT / "audio" / "piano" / "samples.js"
 
 

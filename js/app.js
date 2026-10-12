@@ -33,7 +33,12 @@
     follow: null,
     hintKey: null,
     ribbonNotes: [],
+    ribbonAt: 0,
+    page: 0,
+    range: [60, 79],
   };
+  // ?speed=8 in the address plays songs faster; only used for automated checks.
+  const TEST_SPEED = Number(new URLSearchParams(location.search).get('speed')) || 1;
   const nameOf = (m) => (state.labels === 'none' ? '' : (state.labels === 'letter' ? LETTERS : SOLFEGE)[pcOf(m)]);
 
   /* ---------- crayon textures and pictures ---------- */
@@ -106,6 +111,7 @@
     const dotSize = Math.round(Math.min(kw * 0.64, 64));
     const pct = (v) => (v * 100).toFixed(4) + '%';
     state.dotSize = dotSize;
+    state.range = [whites[0], whites[whites.length - 1]];
 
     whites.forEach((m, i) => {
       const col = noteColor(m);
@@ -170,7 +176,7 @@
       const l = el.querySelector('.lbl');
       if (l) l.textContent = nameOf(+m);
     });
-    [...$('ribbon').children].forEach((d, i) => { d.textContent = nameOf(state.ribbonNotes[i]); });
+    if (state.mode !== 'free') setRibbon(state.ribbonAt);
     $('btn-labels').textContent = LABEL_TEXT[state.labels];
   }
 
@@ -280,28 +286,62 @@
     const im = $('song-doodle');
     im.src = C.doodleURL(song.doodle, 34, 20, song.doodleCol || null);
     const track = $('ribbon');
-    track.textContent = '';
-    state.ribbonNotes = song.parsed.filter((n) => n.midi != null).map((n) => n.midi);
-    state.ribbonNotes.forEach((m) => {
-      const d = document.createElement('span');
-      d.className = 'dot' + (isBlack(m) ? ' sharp' : '');
-      d.style.setProperty('--dc', C.hex(noteColor(m)));
-      d.textContent = nameOf(m);
-      track.appendChild(d);
-    });
+    if (track.childElementCount !== RIBBON_DOTS) {
+      track.textContent = '';
+      for (let j = 0; j < RIBBON_DOTS; j++) track.appendChild(Object.assign(document.createElement('span'), { className: 'dot' }));
+    }
+    state.ribbonNotes = melodyNotes(song);
     setRibbon(0);
   }
   function hideSongBar() {
     $('bar-song').hidden = true;
     $('bar-free').hidden = false;
   }
+  // Only a short window of dots exists and the notes move through it, so a four-minute piece
+  // costs the same as a short tune. The current note stays in the third dot.
+  const RIBBON_DOTS = 16;
   function setRibbon(i) {
-    const track = $('ribbon');
-    [...track.children].forEach((d, j) => {
-      d.classList.toggle('done', j < i);
-      d.classList.toggle('now', j === i);
+    state.ribbonAt = i;
+    const dots = $('ribbon').children, notes = state.ribbonNotes, first = Math.max(0, i - 2);
+    for (let j = 0; j < dots.length; j++) {
+      const d = dots[j], n = first + j, m = notes[n];
+      if (m == null) { d.style.visibility = 'hidden'; continue; }
+      d.style.visibility = '';
+      d.className = 'dot' + (isBlack(m) ? ' sharp' : '') + (n < i ? ' done' : n === i ? ' now' : '');
+      d.style.setProperty('--dc', DOT_COLORS[pcOf(m)]);
+      d.textContent = nameOf(m);
+    }
+  }
+  const DOT_COLORS = Array.from({ length: 12 }, (_, pc) => C.hex(noteColor(60 + pc)));
+
+  // The tune of a song as MIDI note numbers.
+  const melodyNotes = (song) => (song.score ? song.melody.map((n) => n[2]) : song.parsed.filter((n) => n.midi != null).map((n) => n.midi));
+  // Notes above or below the keys on screen are shown an octave or two closer, on the same note name.
+  function fit(m) {
+    const [lo, hi] = state.range;
+    while (m > hi) m -= 12;
+    while (m < lo) m += 12;
+    return m;
+  }
+
+  // Whole pieces keep their notes in songs/<id>.js; load that file the first time the song is chosen.
+  function loadSong(song) {
+    if (!song.score || song.melody) return Promise.resolve(song);
+    const ready = () => {
+      const d = window.SONG_DATA && window.SONG_DATA[song.id];
+      if (!d) return false;
+      song.melody = d.melody;
+      song.accompaniment = d.accompaniment;
+      return true;
+    };
+    if (ready()) return Promise.resolve(song);
+    return new Promise((resolve, reject) => {
+      const tag = document.createElement('script');
+      tag.src = 'songs/' + song.id + '.js';
+      tag.onload = () => (ready() ? resolve(song) : reject(new Error('no notes')));
+      tag.onerror = reject;
+      document.head.appendChild(tag);
     });
-    track.style.transform = `translateX(${-Math.max(0, i - 2) * 48}px)`;
   }
 
   /* ---------- listen: the song plays itself ---------- */
@@ -310,25 +350,10 @@
     state.mode = 'listen';
     state.song = song;
     showSongBar(song, song.jazz ? '재즈로 듣기' : '듣기');
-    const J = song.jazz;
-    const list = [];
-    let beat = 0, idx = 0;
-    for (const n of song.parsed) {
-      if (n.midi != null) list.push({ beat, dur: n.beats, midi: n.midi, vel: J ? 0.95 : 0.85, kind: 'melody', i: idx++ });
-      beat += n.beats;
-    }
-    if (J) list.push(...J.events);
-    // Swing: the second half of each beat is played late, like the last note of a triplet.
-    const swing = (b) => {
-      const whole = Math.floor(b + 1e-9), f = b - whole;
-      return whole + (f <= 0.5 ? (f * 4) / 3 : 2 / 3 + ((f - 0.5) * 2) / 3);
-    };
-    const spb = 60 / song.bpm, t0 = S.now() + 0.5;
-    const events = list.map((e) => {
-      const start = J && J.swing && !e.straight ? swing(e.beat) : e.beat;
-      const stop = J && J.swing && !e.straight ? swing(e.beat + e.dur) : e.beat + e.dur;
-      return { ...e, t: t0 + start * spb, dur: (stop - start) * spb };
-    }).sort((a, b) => a.t - b.t);
+    const t0 = S.now() + 0.5;
+    const events = (song.score ? scoreEvents(song) : tuneEvents(song))
+      .map((e) => ({ ...e, t: t0 + e.at / TEST_SPEED, dur: e.len / TEST_SPEED }))
+      .sort((a, b) => a.t - b.t);
     const end = Math.max(...events.map((e) => e.t + e.dur));
     const L = state.listen = { events, next: 0, end, timeouts: [], lit: new Map(), timer: 0 };
     const tick = () => {
@@ -343,6 +368,34 @@
     L.timer = setInterval(tick, 40);
     tick();
   }
+  // Events in seconds from the start: { at, len, midi, vel, kind: 'melody' | 'fill' | 'back', i }.
+  function scoreEvents(song) {
+    const vel = (v, k) => (0.35 + 0.65 * (v / 127)) * k;
+    return [
+      ...song.melody.map(([at, len, midi, v], i) => ({ at: at / 1000, len: len / 1000, midi, vel: vel(v, 1), kind: 'melody', i })),
+      ...song.accompaniment.map(([at, len, midi, v]) => ({ at: at / 1000, len: len / 1000, midi, vel: vel(v, 0.85), kind: 'back' })),
+    ];
+  }
+  function tuneEvents(song) {
+    const J = song.jazz, list = [];
+    let beat = 0, idx = 0;
+    for (const n of song.parsed) {
+      if (n.midi != null) list.push({ beat, dur: n.beats, midi: n.midi, vel: J ? 0.95 : 0.85, kind: 'melody', i: idx++ });
+      beat += n.beats;
+    }
+    if (J) list.push(...J.events);
+    // Swing: the second half of each beat is played late, like the last note of a triplet.
+    const swing = (b) => {
+      const whole = Math.floor(b + 1e-9), f = b - whole;
+      return whole + (f <= 0.5 ? (f * 4) / 3 : 2 / 3 + ((f - 0.5) * 2) / 3);
+    };
+    const spb = 60 / song.bpm;
+    return list.map((e) => {
+      const start = J && J.swing && !e.straight ? swing(e.beat) : e.beat;
+      const stop = J && J.swing && !e.straight ? swing(e.beat + e.dur) : e.beat + e.dur;
+      return { ...e, at: start * spb, len: (stop - start) * spb };
+    });
+  }
   function schedule(L, ev, now) {
     const v = S.play(ev.midi, { when: ev.t, velocity: ev.vel });
     v.release(ev.t + ev.dur * 0.95);
@@ -351,13 +404,13 @@
     const offAt = Math.max(onAt + 60, (ev.t + ev.dur * 0.8 - now) * 1000);
     L.timeouts.push(setTimeout(() => {
       if (state.listen !== L) return;
-      const k = state.keys[ev.midi];
+      const k = state.keys[fit(ev.midi)];
       if (k) { lightOn(k); L.lit.set(k, (L.lit.get(k) || 0) + 1); burst(k, 1); }
       if (ev.kind === 'melody') setRibbon(ev.i);
     }, onAt));
     L.timeouts.push(setTimeout(() => {
       if (state.listen !== L) return;
-      const k = state.keys[ev.midi];
+      const k = state.keys[fit(ev.midi)];
       if (k && L.lit.get(k)) { lightOff(k); L.lit.set(k, L.lit.get(k) - 1); }
     }, offAt));
   }
@@ -382,7 +435,7 @@
     state.mode = 'follow';
     state.song = song;
     showSongBar(song, '따라치기');
-    state.follow = { notes: song.parsed.filter((n) => n.midi != null).map((n) => n.midi), i: 0 };
+    state.follow = { notes: melodyNotes(song), i: 0 };
     showHint();
   }
   function showHint() {
@@ -390,7 +443,7 @@
     const F = state.follow;
     if (!F) return;
     setRibbon(F.i);
-    const m = F.notes[F.i], k = state.keys[m], g = state.geom[m];
+    const m = fit(F.notes[F.i]), k = state.keys[m], g = state.geom[m];
     if (!k || !g) return;
     // Each key draws its glowing ring once and keeps it; CSS shows it while the key is hinted.
     if (!k._ring) {
@@ -413,7 +466,7 @@
   }
   function onUserNote(m) {
     const F = state.follow;
-    if (!F || state.mode !== 'follow' || m !== F.notes[F.i]) return;
+    if (!F || state.mode !== 'follow' || m !== fit(F.notes[F.i])) return;
     F.i++;
     if (F.i < F.notes.length) { showHint(); return; }
     const song = state.song;
@@ -437,39 +490,56 @@
     hideSongBar();
   }
 
-  /* ---------- song menu ---------- */
+  /* ---------- song menu: eight cards a page ---------- */
+  const PER_PAGE = 8;
+  const pageCount = Math.ceil(SONGS.length / PER_PAGE);
   function buildMenu() {
     const list = $('song-list');
-    // Up to six songs fit three to a row; more go four to a row so the menu never needs scrolling.
-    list.classList.toggle('cols-4', SONGS.length > 6);
-    list.innerHTML = SONGS.map((s, i) => `
+    const card = (s, i) => `
       <div class="card" style="--cc: var(${s.color})">
         <img class="ic" data-doodle="${s.doodle}" data-size="58" data-seed="${i + 20}"${s.doodleCol ? ` data-col="${s.doodleCol}"` : ''} alt="">
         <h3 class="t">${s.title}</h3>
         <div class="sub">
           <span class="c">${s.composer}</span>
           <span class="lv" role="img" aria-label="어려움 ${s.level}단계">${[1, 2, 3].map((n) => `<img data-doodle="star" data-size="16" data-seed="${n}" alt=""${n <= s.level ? '' : ' class="off"'}>`).join('')}</span>
+          <span class="len">${s.length}</span>
         </div>
         <div class="acts">
           <button class="cbtn" type="button" data-play="listen" data-id="${s.id}" style="--bg: var(--c-card)">▶ 듣기</button>
           <button class="cbtn" type="button" data-play="follow" data-id="${s.id}" style="--bg: var(${s.color})"><span class="hand">✋</span>따라치기</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    let html = '';
+    for (let p = 0; p < pageCount; p++) {
+      const songs = SONGS.slice(p * PER_PAGE, (p + 1) * PER_PAGE);
+      html += `<div class="menu-grid${SONGS.length > 6 ? ' cols-4' : ''}" data-page="${p}"${p ? ' hidden' : ''}>${songs.map((s, i) => card(s, p * PER_PAGE + i)).join('')}</div>`;
+    }
+    list.innerHTML = html;
     C.hydrate(list);
+    $('pager').hidden = pageCount < 2;
+    showPage(0);
     list.addEventListener('click', (e) => {
       const b = e.target.closest('[data-play]');
       if (!b) return;
       const song = SONGS.find((s) => s.id === b.dataset.id);
       S.unlock();
       closeMenu();
-      if (b.dataset.play === 'listen') startListen(song); else startFollow(song);
+      loadSong(song)
+        .then(() => (b.dataset.play === 'listen' ? startListen(song) : startFollow(song)))
+        .catch(() => openMenu());
     });
+    $('btn-page-prev').addEventListener('click', () => showPage(state.page - 1));
+    $('btn-page-next').addEventListener('click', () => showPage(state.page + 1));
+  }
+  function showPage(p) {
+    state.page = (p + pageCount) % pageCount;
+    $('song-list').querySelectorAll('.menu-grid').forEach((g) => { g.hidden = +g.dataset.page !== state.page; });
+    $('page-num').textContent = `${state.page + 1} / ${pageCount}`;
   }
   function openMenu() {
     stopSong();
     $('end').hidden = true;
     $('menu').classList.remove('closed');
-    $('song-list').scrollTop = 0;
   }
   // The menu stays laid out while closed, so opening it is only a visibility change.
   function closeMenu() { $('menu').classList.add('closed'); }

@@ -6,8 +6,9 @@
   'use strict';
 
   const SAMPLES = {
-    Ds2: 39, Fs2: 42, A2: 45, C3: 48, Ds3: 51, Fs3: 54, // low notes for the jazz bass line
+    A1: 33, C2: 36, Ds2: 39, Fs2: 42, A2: 45, C3: 48, Ds3: 51, Fs3: 54,
     A3: 57, C4: 60, Ds4: 63, Fs4: 66, A4: 69, C5: 72, Ds5: 75, Fs5: 78, A5: 81, C6: 84,
+    Ds6: 87, Fs6: 90, A6: 93, C7: 96,
   };
   const BASE = 'audio/piano/';
   const MAX_VOICES = 40;
@@ -91,7 +92,7 @@
     });
   }
   // Middle notes first (they are played most), one at a time so the phone stays smooth.
-  const ORDER = [60, 63, 66, 69, 72, 57, 75, 78, 81, 84, 54, 51, 48, 45, 42, 39];
+  const ORDER = [60, 63, 66, 69, 72, 57, 75, 78, 81, 84, 54, 51, 48, 45, 42, 39, 87, 90, 36, 33, 93, 96];
   function decodeAll() {
     if (!decoding) {
       decoding = fetchAll().then(async () => {

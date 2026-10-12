@@ -50,8 +50,14 @@
       <div class="bar static">
         <button id="btn-menu-close" class="cbtn sm" type="button" style="--bg: var(--c-la)">✕ 닫기</button>
         <div class="logo-wrap"><img data-doodle="teddy" data-size="44" data-seed="8" alt=""><span class="title">어떤 노래를 칠까요?</span><img data-doodle="flower" data-size="26" data-seed="9" alt=""></div>
+        <div class="spacer"></div>
+        <div class="pager" id="pager">
+          <button id="btn-page-prev" class="cbtn sq" type="button" style="--bg: var(--c-mi)" aria-label="앞 페이지">◀</button>
+          <span id="page-num" class="page-num">1 / 1</span>
+          <button id="btn-page-next" class="cbtn sq" type="button" style="--bg: var(--c-mi)" aria-label="다음 페이지">▶</button>
+        </div>
       </div>
-      <div class="menu-grid scroll" id="song-list"></div>
+      <div class="song-list" id="song-list"></div>
     </div>
   </section>
 
@@ -83,7 +89,7 @@
       </div>
       <p class="start-text">건반을 눌러서 연주해요. 노래 버튼을 누르면 노래를 듣고 따라 칠 수 있어요.</p>
       <button id="btn-start" class="cbtn big" type="button" style="--bg: var(--c-mi)">▶ 시작하기</button>
-      <p class="credit">피아노 소리: Salamander Grand Piano (Alexander Holm, CC BY 3.0)</p>
+      <p class="credit">피아노 소리: Salamander Grand Piano (Alexander Holm, CC BY 3.0) · 악보: Mutopia Project</p>
     </div>
   </section>
 </div>
