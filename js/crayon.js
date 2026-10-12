@@ -440,9 +440,9 @@
     circ(size * 0.45, size * 0.055, 0.95);
     circ(size * 0.375, size * 0.02, 0.9);
     ctx.fillStyle = rgba(red); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `700 ${Math.round(size * 0.22)}px Gaegu, 'Comic Sans MS', sans-serif`;
+    ctx.font = `${Math.round(size * 0.21)}px Jua, 'Apple SD Gothic Neo', sans-serif`;
     ctx.fillText('참', size / 2, size * 0.35);
-    ctx.font = `700 ${Math.round(size * 0.18)}px Gaegu, 'Comic Sans MS', sans-serif`;
+    ctx.font = `${Math.round(size * 0.165)}px Jua, 'Apple SD Gothic Neo', sans-serif`;
     ctx.fillText('잘했어요', size / 2, size * 0.56);
     const hs = size * 0.15;
     ctx.fill(heartPath(size / 2 - hs / 2, size * 0.66, hs));

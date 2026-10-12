@@ -35,6 +35,7 @@
     ribbonNotes: [],
     ribbonAt: 0,
     page: 0,
+    request: 0,      // bumps on every song choice and on 그만, so a late-loading song cannot start
     range: [60, 79],
   };
   // ?speed=8 in the address plays songs faster; only used for automated checks.
@@ -209,10 +210,15 @@
     while (fx.childElementCount > 40) fx.firstElementChild.remove();
   }
 
+  let soundHintAt = 0;
   function userPress(k) {
     lightOn(k);
     const m = +k.dataset.midi;
     const v = S.play(m);
+    if (!S.running && performance.now() - soundHintAt > 6000) {
+      soundHintAt = performance.now();
+      toast(`소리를 켜고 있어요. 계속 안 나면 화면을 다시 톡 눌러 주세요. (소리: ${S.status}, 피아노 ${S.loaded}/22)`);
+    }
     burst(k);
     onUserNote(m);
     return v;
@@ -277,6 +283,38 @@
     held.delete(e.code);
   });
 
+  /* ---------- buttons ---------- */
+  // Buttons act the moment the finger lifts. iPhones sometimes delay or drop the browser's own
+  // 'click' (inside game frames, or when they wait to see if a tap is a double tap), which made
+  // buttons need two or three presses. A mouse or keyboard still works through 'click'.
+  let lastTap = 0;
+  function onTap(area, fn) {
+    let down = null;
+    const clear = () => { if (down) down.b.classList.remove('pressed'); down = null; };
+    area.addEventListener('pointerdown', (e) => {
+      const b = e.target.closest && e.target.closest('button');
+      if (!b || !area.contains(b) || b.disabled) return;
+      clear();
+      down = { id: e.pointerId, x: e.clientX, y: e.clientY, b };
+      b.classList.add('pressed');
+    });
+    area.addEventListener('pointerup', (e) => {
+      if (!down || e.pointerId !== down.id) return;
+      const { b, x, y } = down;
+      clear();
+      if (Math.hypot(e.clientX - x, e.clientY - y) > 30) return; // a slide, not a tap
+      lastTap = performance.now();
+      S.unlock();
+      fn(b);
+    });
+    area.addEventListener('pointercancel', clear);
+    area.addEventListener('click', (e) => {
+      if (performance.now() - lastTap < 800) return; // the tap already did it
+      const b = e.target.closest && e.target.closest('button');
+      if (b && area.contains(b)) fn(b);
+    });
+  }
+
   /* ---------- song bar and note ribbon ---------- */
   function showSongBar(song, modeText) {
     $('bar-free').hidden = true;
@@ -327,6 +365,7 @@
   // Whole pieces keep their notes in songs/<id>.js; load that file the first time the song is chosen.
   function loadSong(song) {
     if (!song.score || song.melody) return Promise.resolve(song);
+    if (song.loading) return song.loading;
     const ready = () => {
       const d = window.SONG_DATA && window.SONG_DATA[song.id];
       if (!d) return false;
@@ -335,13 +374,23 @@
       return true;
     };
     if (ready()) return Promise.resolve(song);
-    return new Promise((resolve, reject) => {
+    song.loading = new Promise((resolve, reject) => {
       const tag = document.createElement('script');
       tag.src = 'songs/' + song.id + '.js';
       tag.onload = () => (ready() ? resolve(song) : reject(new Error('no notes')));
-      tag.onerror = reject;
+      tag.onerror = () => reject(new Error('could not load songs/' + song.id + '.js'));
       document.head.appendChild(tag);
-    });
+    }).finally(() => { song.loading = null; });
+    return song.loading;
+  }
+  // After the start screen, fetch every piece in the background so 듣기 starts at once later.
+  function prefetchSongs() {
+    const list = SONGS.filter((s) => s.score && !s.melody);
+    const next = () => {
+      const song = list.shift();
+      if (song) loadSong(song).catch(() => {}).then(() => setTimeout(next, 250));
+    };
+    setTimeout(next, 1500);
   }
 
   /* ---------- listen: the song plays itself ---------- */
@@ -350,18 +399,25 @@
     state.mode = 'listen';
     state.song = song;
     showSongBar(song, song.jazz ? '재즈로 듣기' : '듣기');
-    const t0 = S.now() + 0.5;
+    // The song runs on the wall clock, not the sound card's clock: if a phone pauses its sound
+    // (another app, the lock screen), the keys keep moving and the song still ends.
+    const t0 = wallClock() + 0.5;
     const events = (song.score ? scoreEvents(song) : tuneEvents(song))
       .map((e) => ({ ...e, t: t0 + e.at / TEST_SPEED, dur: e.len / TEST_SPEED }))
       .sort((a, b) => a.t - b.t);
-    const end = Math.max(...events.map((e) => e.t + e.dur));
-    const L = state.listen = { events, next: 0, end, timeouts: [], lit: new Map(), timer: 0 };
+    const end = events.reduce((m, e) => Math.max(m, e.t + e.dur), t0);
+    const L = state.listen = { events, next: 0, end, timeouts: [], lit: new Map(), timer: 0, warned: false };
     const tick = () => {
       if (state.listen !== L) return;
-      const now = S.now();
+      const now = wallClock();
       while (L.next < events.length && events[L.next].t < now + 0.25) {
         schedule(L, events[L.next], now);
         L.next++;
+      }
+      if (!S.running && !L.warned && now > t0 + 1) {
+        L.warned = true;
+        S.unlock();
+        toast('소리가 안 나면 화면을 한 번 톡 눌러 주세요');
       }
       if (L.next >= events.length && now > L.end + 0.3) finishListen(song);
     };
@@ -370,10 +426,11 @@
   }
   // Events in seconds from the start: { at, len, midi, vel, kind: 'melody' | 'fill' | 'back', i }.
   function scoreEvents(song) {
-    const vel = (v, k) => (0.35 + 0.65 * (v / 127)) * k;
+    // song.speed slows a piece down (below 1) and song.accomp sets how loud the other hand plays.
+    const vel = (v, k) => (0.35 + 0.65 * (v / 127)) * k, sp = 1000 * (song.speed || 1), acc = song.accomp || 0.85;
     return [
-      ...song.melody.map(([at, len, midi, v], i) => ({ at: at / 1000, len: len / 1000, midi, vel: vel(v, 1), kind: 'melody', i })),
-      ...song.accompaniment.map(([at, len, midi, v]) => ({ at: at / 1000, len: len / 1000, midi, vel: vel(v, 0.85), kind: 'back' })),
+      ...song.melody.map(([at, len, midi, v], i) => ({ at: at / sp, len: len / sp, midi, vel: vel(v, 1), kind: 'melody', i })),
+      ...song.accompaniment.map(([at, len, midi, v]) => ({ at: at / sp, len: len / sp, midi, vel: vel(v, acc), kind: 'back' })),
     ];
   }
   function tuneEvents(song) {
@@ -396,9 +453,13 @@
       return { ...e, at: start * spb, len: (stop - start) * spb };
     });
   }
+  const wallClock = () => performance.now() / 1000;
   function schedule(L, ev, now) {
-    const v = S.play(ev.midi, { when: ev.t, velocity: ev.vel });
-    v.release(ev.t + ev.dur * 0.95);
+    // Sound only while the phone's audio is running; otherwise notes would pile up and all play at once later.
+    if (S.running) {
+      const at = S.now() + Math.max(0, ev.t - now);
+      S.play(ev.midi, { when: at, velocity: ev.vel }).release(at + ev.dur * 0.95);
+    }
     if (ev.kind === 'back') return; // chords and bass only sound; the keys show the melody
     const onAt = Math.max(0, (ev.t - now) * 1000);
     const offAt = Math.max(onAt + 60, (ev.t + ev.dur * 0.8 - now) * 1000);
@@ -482,6 +543,7 @@
   }
 
   function stopSong() {
+    state.request++;
     endListen();
     if (state.follow) { clearHint(); state.follow = null; }
     if (state.mode !== 'free') S.stopAll();
@@ -509,31 +571,40 @@
           <button class="cbtn" type="button" data-play="follow" data-id="${s.id}" style="--bg: var(${s.color})"><span class="hand">✋</span>따라치기</button>
         </div>
       </div>`;
-    let html = '';
+    // All pages sit side by side and slide, so turning a page needs no new layout.
+    let html = `<div class="pages" style="--n: ${pageCount}">`;
     for (let p = 0; p < pageCount; p++) {
       const songs = SONGS.slice(p * PER_PAGE, (p + 1) * PER_PAGE);
-      html += `<div class="menu-grid${SONGS.length > 6 ? ' cols-4' : ''}" data-page="${p}"${p ? ' hidden' : ''}>${songs.map((s, i) => card(s, p * PER_PAGE + i)).join('')}</div>`;
+      html += `<div class="menu-grid${SONGS.length > 6 ? ' cols-4' : ''}" data-page="${p}">${songs.map((s, i) => card(s, p * PER_PAGE + i)).join('')}</div>`;
     }
-    list.innerHTML = html;
+    list.innerHTML = html + '</div>';
     C.hydrate(list);
     $('pager').hidden = pageCount < 2;
     showPage(0);
-    list.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-play]');
-      if (!b) return;
+    onTap(list, (b) => {
+      if (!b.dataset.play) return;
       const song = SONGS.find((s) => s.id === b.dataset.id);
-      S.unlock();
       closeMenu();
+      // A piece may take a moment to load; 그만 or another choice meanwhile cancels this one.
+      const req = ++state.request;
+      if (song.score && !song.melody) toast('노래를 불러오고 있어요…');
       loadSong(song)
-        .then(() => (b.dataset.play === 'listen' ? startListen(song) : startFollow(song)))
-        .catch(() => openMenu());
+        .then(() => {
+          if (req !== state.request) return;
+          hideToast();
+          if (b.dataset.play === 'listen') startListen(song); else startFollow(song);
+        })
+        .catch(() => {
+          if (req !== state.request) return;
+          openMenu();
+          toast('노래를 불러오지 못했어요. 다시 눌러 주세요.');
+        });
     });
-    $('btn-page-prev').addEventListener('click', () => showPage(state.page - 1));
-    $('btn-page-next').addEventListener('click', () => showPage(state.page + 1));
+    onTap($('pager'), (b) => showPage(state.page + (b.id === 'btn-page-prev' ? -1 : 1)));
   }
   function showPage(p) {
     state.page = (p + pageCount) % pageCount;
-    $('song-list').querySelectorAll('.menu-grid').forEach((g) => { g.hidden = +g.dataset.page !== state.page; });
+    $('song-list').firstElementChild.style.setProperty('--p', state.page);
     $('page-num').textContent = `${state.page + 1} / ${pageCount}`;
   }
   function openMenu() {
@@ -555,9 +626,10 @@
     b.className = 'cbtn';
     b.style.setProperty('--bg', `var(${colorVar})`);
     b.innerHTML = html;
-    b.addEventListener('click', () => { $('end').hidden = true; fn(); });
+    b._act = fn;
     $('end-acts').appendChild(b);
   }
+  onTap($('end-acts'), (b) => { $('end').hidden = true; b._act(); });
   function showEnd(kind, song) {
     const slot = $('stamp-slot');
     slot.textContent = '';
@@ -636,24 +708,26 @@
     }).catch(() => {});
   }
 
-  $('btn-start').addEventListener('click', () => {
-    S.unlock();
+  onTap($('start'), () => {
     $('start').hidden = true;
     const t = S.now() + 0.05;
     [60, 64, 67].forEach((m, i) => S.play(m, { when: t + i * 0.1, velocity: 0.6 }).release(t + i * 0.1 + 0.6));
     if (fsSupported && window.matchMedia('(pointer: coarse)').matches) enterFullscreen();
     keepAwake();
+    prefetchSongs();
   });
-  $('btn-full').addEventListener('click', () => { if (isFullscreen()) exitFullscreen(); else enterFullscreen(); });
-  $('btn-songs').addEventListener('click', openMenu);
-  $('btn-menu-close').addEventListener('click', closeMenu);
-  $('btn-stop').addEventListener('click', stopSong);
-  $('btn-labels').addEventListener('click', () => {
-    const order = ['solfege', 'letter', 'none'];
-    state.labels = order[(order.indexOf(state.labels) + 1) % order.length];
-    store.set('labels', state.labels);
-    renderLabels();
+  onTap($('bar-free'), (b) => {
+    if (b.id === 'btn-songs') openMenu();
+    else if (b.id === 'btn-full') { if (isFullscreen()) exitFullscreen(); else enterFullscreen(); }
+    else if (b.id === 'btn-labels') {
+      const order = ['solfege', 'letter', 'none'];
+      state.labels = order[(order.indexOf(state.labels) + 1) % order.length];
+      store.set('labels', state.labels);
+      renderLabels();
+    }
   });
+  onTap($('bar-song'), (b) => { if (b.id === 'btn-stop') stopSong(); });
+  onTap($('btn-menu-close').parentElement, (b) => { if (b.id === 'btn-menu-close') closeMenu(); });
   function escape() {
     if (menuOpen()) closeMenu();
     else if (!$('end').hidden) $('end').hidden = true;
@@ -665,12 +739,27 @@
     else if (state.mode === 'listen') stopSong();
   });
 
+  // A small note at the bottom of the screen. Errors show here too, so a photo of the screen
+  // says what went wrong on a phone we cannot look at.
+  let toastTimer = 0;
+  function toast(msg, ms = 4000) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, ms);
+  }
+  function hideToast() { $('toast').hidden = true; }
+  window.addEventListener('error', (e) => toast('앗, 문제가 생겼어요: ' + (e.message || '알 수 없는 오류'), 10000));
+  window.addEventListener('unhandledrejection', (e) => toast('앗, 문제가 생겼어요: ' + ((e.reason && e.reason.message) || e.reason || '알 수 없는 오류'), 10000));
+
   // Keep the page still: no pinch zoom, pull-to-refresh, long-press menus or double-tap zoom.
   document.addEventListener('touchmove', (e) => { if (!e.target.closest('.scroll')) e.preventDefault(); }, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());
   // iOS only lets sound start from certain touches, so try on every tap.
+  document.addEventListener('touchstart', S.unlock, { passive: true });
   document.addEventListener('touchend', S.unlock, { passive: true });
   document.addEventListener('click', S.unlock);
 
@@ -688,6 +777,6 @@
   // to each screen (the font comes in many small pieces, one per group of letters).
   if (document.fonts && document.fonts.load) {
     const text = stage.textContent + '끝까지다쳤어요잘들었어요이제따라쳐볼까요한번더다른노래건반놀이재즈로듣기참잘했어요';
-    ['400', '700'].forEach((w) => document.fonts.load(`${w} 24px Gaegu`, text).catch(() => {}));
+    document.fonts.load('24px Jua', text).catch(() => {});
   }
 })();

@@ -15,7 +15,8 @@
   --c-black: #8a79b6;
   --c-stamp: #ef5470;
   --c-card: #fffaf0;
-  --font-hand: 'Gaegu', 'Comic Sans MS', 'Apple SD Gothic Neo', 'Malgun Gothic', cursive;
+  /* Jua: a round, friendly Korean typeface that is easy for children to read. It has one weight. */
+  --font-hand: 'Jua', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --paper-tex: none;
   --wax: none;
   /* set by app.js from the screen size */
@@ -35,7 +36,7 @@ html, body {
   overscroll-behavior: none; touch-action: manipulation; touch-action: none;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
 }
-body { font-family: var(--font-hand); }
+body { font-family: var(--font-hand); font-synthesis: none; }
 [hidden] { display: none !important; }
 img { -webkit-user-drag: none; }
 
@@ -51,7 +52,9 @@ img { -webkit-user-drag: none; }
 #topbar { position: relative; flex: 0 0 calc(66px * var(--z)); z-index: 3; }
 .bar {
   position: absolute; left: 0; top: 0; width: var(--lw); height: 66px; zoom: var(--z);
-  display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  /* iPhones hold back touches that start close to the screen edge (they might be a swipe),
+     so the buttons sit well inside it */
+  display: flex; align-items: center; gap: 12px; padding: 4px 32px 0;
 }
 .bar.static { position: relative; flex: 0 0 66px; width: auto; zoom: 1; }
 .spacer { flex: 1; }
@@ -80,7 +83,7 @@ img { -webkit-user-drag: none; }
   box-shadow: 0 4px 0 var(--edge);
   cursor: pointer; touch-action: manipulation;
 }
-.cbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--edge); }
+.cbtn:active, .cbtn.pressed { transform: translateY(3px); box-shadow: 0 1px 0 var(--edge); }
 .cbtn:focus-visible { outline: 3px solid var(--c-sol); outline-offset: 3px; }
 .cbtn img { width: 24px; height: 24px; }
 .cbtn svg { flex: 0 0 auto; }
@@ -156,7 +159,9 @@ img { -webkit-user-drag: none; }
 .panel { position: relative; width: var(--lw); height: var(--lh); zoom: var(--z); display: flex; flex-direction: column; }
 
 /* song menu */
-.song-list { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.song-list { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.pages { --p: 0; display: flex; width: calc(100% * var(--n)); height: 100%; transform: translateX(calc(-100% / var(--n) * var(--p))); transition: transform .28s ease; }
+.pages > .menu-grid { flex: 0 0 calc(100% / var(--n)); height: 100%; }
 .pager { display: flex; align-items: center; gap: 8px; }
 .pager .cbtn.sq { width: 46px; font-size: 20px; }
 .page-num { min-width: 3.2em; text-align: center; font-size: 22px; font-weight: 700; }
@@ -213,7 +218,20 @@ img { -webkit-user-drag: none; }
 .start-panel { align-items: center; justify-content: center; gap: 14px; text-align: center; }
 .start-art { position: relative; display: flex; align-items: center; gap: 10px; }
 .start-text { position: relative; margin: 0; max-width: 30em; font-size: 23px; line-height: 1.3; color: var(--ink-soft); }
+.start-tip { position: relative; margin: -6px 0 0; font-size: 18px; color: var(--ink-soft); }
 .credit { position: absolute; left: 0; right: 0; bottom: 8px; margin: 0; font-size: 14px; color: var(--ink-soft); }
+
+/* small notes and error messages at the bottom of the stage */
+.toast {
+  position: absolute; left: 50%; bottom: calc(18px * var(--z) + var(--sb)); z-index: 30; transform: translateX(-50%);
+  max-width: 80%; padding: 8px 16px 6px; text-align: center;
+  font-size: calc(19px * var(--z)); font-weight: 700; line-height: 1.3; color: var(--ink);
+  background: var(--wax) 0 0 / 120px 120px, var(--c-card);
+  border: 3px solid color-mix(in srgb, var(--c-mi) 50%, var(--ink));
+  border-radius: 18px 24px 16px 22px / 22px 16px 24px 18px;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--c-mi) 50%, var(--ink));
+  pointer-events: none;
+}
 
 /* turn-your-phone hint, shown upright in the real screen direction */
 #rotate-hint {
@@ -232,6 +250,6 @@ img { -webkit-user-drag: none; }
   .kb > .marker img, .key.hint .ring, .key.hint:not(.on) > canvas.glow { animation: none; }
   .key.hint:not(.on) > canvas.glow { opacity: .4; }
   .fx img { animation-duration: .01s; }
-  .track, .dot { transition: none; }
+  .track, .dot, .pages { transition: none; }
   .confetti img, .end-row img, .stamp-slot canvas { animation: none; }
 }

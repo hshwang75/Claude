@@ -39,5 +39,5 @@
 Crayon Piano: a hand-drawn crayon piano for kids. Tap the keys to color them in, listen to six classical pieces, and play along as the next key lights up.
 
 피아노 소리 / Piano sound: Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0)
-글꼴 / Font: Gaegu (SIL Open Font License)
+글꼴 / Font: Jua (SIL Open Font License)
 ```

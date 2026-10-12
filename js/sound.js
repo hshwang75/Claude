@@ -72,12 +72,9 @@
   function shrink(buf) {
     const len = Math.min(buf.length, Math.round(KEEP_SECONDS * buf.sampleRate));
     const out = ctx.createBuffer(1, len, buf.sampleRate);
-    const o = out.getChannelData(0), chs = buf.numberOfChannels;
-    for (let c = 0; c < chs; c++) {
-      const d = buf.getChannelData(c);
-      for (let i = 0; i < len; i++) o[i] += d[i] / chs;
-    }
-    const fade = Math.min(len, Math.round(0.5 * buf.sampleRate));
+    // One channel is enough for a phone speaker; copying it is done by the browser, not in a JS loop.
+    out.copyToChannel(buf.getChannelData(0).subarray(0, len), 0);
+    const o = out.getChannelData(0), fade = Math.min(len, Math.round(0.5 * buf.sampleRate));
     for (let i = 0; i < fade; i++) o[len - 1 - i] *= i / fade;
     return out;
   }
@@ -108,13 +105,53 @@
     return decoding;
   }
 
-  // Call from a tap or click: browsers only allow sound after the person touches the page.
+  // iPhones mute web sound when the ring/silent switch is on silent, unless the page is playing
+  // media. A looping silent <audio>, started from a tap, makes iOS treat the page like a music
+  // player, so the piano is heard either way.
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document);
+  let keepAlive = null;
+  function silentWav() {
+    const rate = 8000, n = rate / 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const text = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    text(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); text(8, 'WAVE'); text(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    text(36, 'data'); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  function startKeepAlive() {
+    if (!IOS) return;
+    try {
+      if (!keepAlive) {
+        keepAlive = new Audio(silentWav());
+        keepAlive.loop = true;
+        keepAlive.setAttribute('playsinline', '');
+      }
+      if (keepAlive.paused) keepAlive.play().catch(() => {});
+    } catch (e) { /* media blocked; the switch then decides */ }
+  }
+
+  // Call from every tap or click: browsers, iPhones most of all, only start sound from a touch.
   function unlock() {
-    if (!init()) return;
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
-    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (!init()) return;
+    startKeepAlive();
+    if (ctx.state !== 'running') {
+      ctx.resume().catch(() => {});
+      // The old iPhone way to wake sound: play one silent sample inside the touch.
+      try {
+        const src = ctx.createBufferSource();
+        src.buffer = ctx.createBuffer(1, 1, 22050);
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch (e) { /* ignore */ }
+    }
     decodeAll();
   }
+  // Let the phone's music controls go away when the page is hidden.
+  document.addEventListener('visibilitychange', () => {
+    if (keepAlive && document.visibilityState === 'hidden') keepAlive.pause();
+  });
 
   const now = () => (ctx ? ctx.currentTime : performance.now() / 1000);
 
@@ -200,7 +237,9 @@
   }
 
   function play(midi, opts = {}) {
-    if (!ctx) return NOOP;
+    // While the phone keeps sound switched off, make nothing: notes made then never finish and
+    // pile up, which slows everything down.
+    if (!ctx || ctx.state !== 'running') return NOOP;
     const when = Math.max(opts.when || 0, ctx.currentTime);
     const vel = opts.velocity ?? 0.9;
     const s = nearest(midi);
@@ -218,5 +257,8 @@
     unlock, play, stopAll, now,
     get ready() { return buffers.size > 0; },
     get running() { return !!ctx && ctx.state === 'running'; },
+    get status() { return ctx ? ctx.state : 'none'; },
+    get loaded() { return buffers.size; },
+    get active() { return voices.size; },
   };
 })();
