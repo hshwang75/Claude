@@ -25,7 +25,7 @@
 | 엘리제를 위하여 | 베토벤 | 2:35 |
 | 터키 행진곡 | 모차르트 | 3:35 |
 | 송어 | 슈베르트 | 2:42 |
-| 아름답고 푸른 도나우 | 요한 슈트라우스 | 7:00 |
+| 아름답고 푸른 도나우 (주제) | 요한 슈트라우스 | 0:39 |
 | 산속 마왕의 궁전 | 그리그 | 2:36 |
 | 엔터테이너 | 스콧 조플린 | 4:12 |
 | 강아지 왈츠 | 쇼팽 | 1:29 |
@@ -39,7 +39,7 @@
 - **듣기:** 양손 피아노 악보가 그대로 연주돼요. 건반에는 멜로디가 반짝여요.
 - **따라치기:** 멜로디를 처음부터 끝까지 한 음씩 따라 쳐요.
 - **넓은 건반:** 위쪽의 건반 그림 버튼을 누르면 진짜 피아노의 오른손처럼 가운데 도부터 흰 건반이 18개(태블릿은 22개)로 늘어나요. 다시 누르면 크고 누르기 쉬운 12개로 돌아와요.
-- **건반 밖의 음:** 곡 전체를 한 옥타브 옮겨서 화면 건반에 가장 잘 맞추고, 그래도 넘는 음만 같은 이름의 건반에서 반짝여요. 듣기 소리는 원래 높이 그대로예요.
+- **건반 밖의 음:** 음이 화면 건반 안에 있으면 실제 높이 그대로 반짝여요. 건반을 넘는 부분만 같은 이름의 건반으로 한 옥타브씩 옮기는데, 올라가는 음은 올라가게, 내려가는 음은 내려가게 보이는 곳에서 옮겨요. 듣기 소리는 원래 높이 그대로예요.
 
 ## 내 컴퓨터에서 실행하기
 
@@ -75,7 +75,7 @@ python3 scripts/build.py zip       # dist/crayon-piano-itch.zip 다시 만들기
 
 짧은 노래는 `js/songs.js`에 넣어요. 음 이름 뒤에 박자를 붙여 써요(`C4`는 가운데 도, `E5:.5`는 반 박자, 박자를 안 쓰면 한 박자, `R`은 쉼표).
 
-긴 곡은 [Mutopia Project](https://www.mutopiaproject.org)의 무료 악보(LilyPond)와 [IMSLP](https://imslp.org)의 무료 MIDI 파일에서 만들어요. `scripts/import_scores.py`에 곡 목록이 있고, Mutopia 저장소를 내려받은 뒤 이렇게 실행하면 `songs/` 폴더의 곡 파일이 다시 만들어져요.
+긴 곡은 [Mutopia Project](https://www.mutopiaproject.org)의 무료 악보(LilyPond)에서 만들어요. `scripts/import_scores.py`에 곡 목록이 있고, Mutopia 저장소를 내려받은 뒤 이렇게 실행하면 `songs/` 폴더의 곡 파일이 다시 만들어져요.
 
 ```bash
 pip install lilypond mido
@@ -91,8 +91,8 @@ python3 scripts/import_scores.py mutopia
 - 노래는 모두 저작권이 끝난 클래식 곡이에요.
 - 긴 곡의 악보: [Mutopia Project](https://www.mutopiaproject.org). 대부분 Public Domain이고, 다음 곡은 아래 라이선스를 따라요. 이 곡들의 `songs/` 파일도 같은 라이선스예요.
   - 즐거운 농부 (슈만): CC BY-SA 2.5
+  - 아름답고 푸른 도나우 (요한 슈트라우스): CC BY-SA 4.0
   - 피아노 소나타 16번 (모차르트): CC BY-SA 3.0
-- 아름답고 푸른 도나우: Christian Mondrup의 합창과 네 손 피아노 편곡(Werner Icking Music Collection, [IMSLP #148223](https://imslp.org/wiki/An_der_sch%C3%B6nen_blauen_Donau,_Op.314_(Strauss_Jr.,_Johann))) 중 피아노 부분, [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/). 비영리 조건이라 이 앱을 유료로 팔거나 후원을 받을 때는 이 곡을 빼야 해요. `songs/danube.js`도 같은 라이선스예요.
 
 ## 저작권이 남아 있는 곡 (가족용)
 

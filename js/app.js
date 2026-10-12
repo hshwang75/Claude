@@ -38,7 +38,7 @@
     page: 0,
     request: 0,      // bumps on every song choice and on 그만, so a late-loading song cannot start
     range: [60, 79],
-    shift: 0,          // octave move of the playing song on the keys (see fit)
+    offsets: [],       // octave move of each tune note of the playing song on the keys (see songOffsets)
   };
   // ?speed=8 in the address plays songs faster; only used for automated checks.
   const TEST_SPEED = Number(new URLSearchParams(location.search).get('speed')) || 1;
@@ -51,6 +51,8 @@
   C.fillLogos(document);
 
   /* ---------- layout: always landscape ---------- */
+  // Safari on an iPhone or iPad, not a home-screen app (which has no browser bars).
+  const IOS_BROWSER = (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && 'ontouchend' in document)) && !navigator.standalone;
   const probe = document.createElement('div');
   probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
     'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
@@ -67,7 +69,10 @@
 
     const p = getComputedStyle(probe);
     const i = { t: parseFloat(p.paddingTop) || 0, r: parseFloat(p.paddingRight) || 0, b: parseFloat(p.paddingBottom) || 0, l: parseFloat(p.paddingLeft) || 0 };
-    const s = portrait ? { l: i.t, r: i.b, t: i.r, b: i.l } : i;
+    const s = portrait ? { l: i.t, r: i.b, t: i.r, b: i.l } : { ...i };
+    // With the iPhone itself turned sideways, Safari keeps a strip along the top of the screen:
+    // a tap there brings back its bars instead of reaching the page. Keep the buttons below it.
+    if (IOS_BROWSER && !portrait) s.t += 30;
     const innerW = W - s.l - s.r, innerH = H - s.t - s.b;
     const z = Math.min(1.6, Math.max(0.72, Math.min(innerW / 812, innerH / 375)));
     const set = (k, v) => root.style.setProperty(k, v);
@@ -116,7 +121,7 @@
     const pct = (v) => (v * 100).toFixed(4) + '%';
     state.dotSize = dotSize;
     state.range = [whites[0], whites[whites.length - 1]];
-    if (state.song) state.shift = songShift(state.song);
+    if (state.song) state.offsets = songOffsets(state.song);
 
     whites.forEach((m, i) => {
       const col = noteColor(m);
@@ -371,25 +376,50 @@
 
   // The tune of a song as MIDI note numbers.
   const melodyNotes = (song) => (song.score ? song.melody.map((n) => n[2]) : song.parsed.filter((n) => n.midi != null).map((n) => n.midi));
-  // Where a note of the playing song shows on the keys. First the whole song moves by the octave
-  // that keeps the most notes on screen, so the tune keeps its shape; a note still outside then
-  // moves an octave or two closer, on the same note name. 듣기 still sounds at the real pitch.
+  // A note outside the keys on screen shows an octave or two closer, on the same note name.
   function fit(m) {
     const [lo, hi] = state.range;
-    m += state.shift;
     while (m > hi) m -= 12;
     while (m < lo) m += 12;
     return m;
   }
-  function songShift(song) {
-    const [lo, hi] = state.range;
-    let best = 0, fewest = Infinity;
-    for (const by of [0, -12, 12, -24, 24]) {
-      const outside = melodyNotes(song).filter((m) => m + by < lo || m + by > hi).length;
-      if (outside < fewest) { best = by; fewest = outside; }
+  // Where each tune note of a song shows on the keys, as an octave move per note. A note stays at
+  // its real height where the keys allow; a tune that goes beyond them moves by an octave at the
+  // places where that keeps every step up a step up and every step down a step down on the keys,
+  // so the lit keys follow the shape of what is heard. 듣기 still sounds at the real pitch.
+  // (Cheapest path through the possible moves: each move costs 1, a move that turns the
+  // direction around 3 more, and every note away from its real octave a little.)
+  const MOVES = [-36, -24, -12, 0, 12, 24, 36];
+  function songOffsets(song) {
+    const [lo, hi] = state.range, notes = melodyNotes(song), back = [];
+    const fits = (m, o) => m + o >= lo && m + o <= hi;
+    const away = (o) => (Math.abs(o) / 12) * 0.1;
+    let cost = MOVES.map((o) => (notes.length && fits(notes[0], o) ? away(o) : Infinity));
+    for (let i = 1; i < notes.length; i++) {
+      const a = notes[i - 1], b = notes[i], from = [];
+      cost = MOVES.map((o) => {
+        let best = Infinity, arg = 0;
+        if (fits(b, o)) {
+          MOVES.forEach((p, k) => {
+            const c = cost[k] + (p === o ? 0 : 1 + (Math.sign(b + o - a - p) !== Math.sign(b - a) ? 3 : 0));
+            if (c < best) { best = c; arg = k; }
+          });
+        }
+        from.push(arg);
+        return best + away(o);
+      });
+      back.push(from);
     }
-    return best;
+    const out = new Array(notes.length);
+    let j = cost.indexOf(Math.min(...cost));
+    for (let i = notes.length - 1; i >= 0; i--) {
+      out[i] = MOVES[j];
+      if (i) j = back[i - 1][j];
+    }
+    return out;
   }
+  // The key for tune note i of the playing song.
+  const tuneKey = (m, i) => fit(m + (state.offsets[i] || 0));
 
   // Whole pieces keep their notes in songs/<id>.js; load that file the first time the song is chosen.
   function loadSong(song) {
@@ -427,7 +457,7 @@
     stopSong();
     state.mode = 'listen';
     state.song = song;
-    state.shift = songShift(song);
+    state.offsets = songOffsets(song);
     showSongBar(song, song.jazz ? '재즈로 듣기' : '듣기');
     // The song runs on the wall clock, not the sound card's clock: if a phone pauses its sound
     // (another app, the lock screen), the keys keep moving and the song still ends.
@@ -436,7 +466,7 @@
       .map((e) => ({ ...e, t: t0 + e.at / TEST_SPEED, dur: e.len / TEST_SPEED }))
       .sort((a, b) => a.t - b.t);
     const end = events.reduce((m, e) => Math.max(m, e.t + e.dur), t0);
-    const L = state.listen = { events, next: 0, end, timeouts: [], lit: new Map(), timer: 0, warned: false };
+    const L = state.listen = { events, next: 0, end, timeouts: [], lit: new Map(), timer: 0, warned: false, offset: 0 };
     const tick = () => {
       if (state.listen !== L) return;
       const now = wallClock();
@@ -508,15 +538,17 @@
     if (ev.kind === 'back') return; // chords and bass only sound; the keys show the melody
     const onAt = Math.max(0, (ev.t - now) * 1000);
     const offAt = Math.max(onAt + 60, (ev.t + ev.dur * 0.8 - now) * 1000);
+    let k = null;
     L.timeouts.push(setTimeout(() => {
       if (state.listen !== L) return;
-      const k = state.keys[fit(ev.midi)];
+      // Other notes shown while the tune rests move with the tune note before them.
+      if (ev.kind === 'melody') L.offset = state.offsets[ev.i] || 0;
+      k = state.keys[ev.kind === 'melody' ? tuneKey(ev.midi, ev.i) : fit(ev.midi + (L.offset || 0))];
       if (k) { lightOn(k); L.lit.set(k, (L.lit.get(k) || 0) + 1); burst(k, 1); }
       if (ev.kind === 'melody') setRibbon(ev.i);
     }, onAt));
     L.timeouts.push(setTimeout(() => {
       if (state.listen !== L) return;
-      const k = state.keys[fit(ev.midi)];
       if (k && L.lit.get(k)) { lightOff(k); L.lit.set(k, L.lit.get(k) - 1); }
     }, offAt));
   }
@@ -540,7 +572,7 @@
     stopSong();
     state.mode = 'follow';
     state.song = song;
-    state.shift = songShift(song);
+    state.offsets = songOffsets(song);
     showSongBar(song, '따라치기');
     state.follow = { notes: melodyNotes(song), i: 0 };
     showHint();
@@ -550,7 +582,7 @@
     const F = state.follow;
     if (!F) return;
     setRibbon(F.i);
-    const m = fit(F.notes[F.i]), k = state.keys[m], g = state.geom[m];
+    const m = tuneKey(F.notes[F.i], F.i), k = state.keys[m], g = state.geom[m];
     if (!k || !g) return;
     // Each key draws its glowing ring once and keeps it; CSS shows it while the key is hinted.
     if (!k._ring) {
@@ -573,7 +605,7 @@
   }
   function onUserNote(m) {
     const F = state.follow;
-    if (!F || state.mode !== 'follow' || m !== fit(F.notes[F.i])) return;
+    if (!F || state.mode !== 'follow' || m !== tuneKey(F.notes[F.i], F.i)) return;
     F.i++;
     if (F.i < F.notes.length) { showHint(); return; }
     const song = state.song;
@@ -595,7 +627,7 @@
     if (state.mode !== 'free') S.stopAll();
     state.mode = 'free';
     state.song = null;
-    state.shift = 0;
+    state.offsets = [];
     hideSongBar();
   }
 
