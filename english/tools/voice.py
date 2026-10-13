@@ -210,7 +210,8 @@ def first_longer(ph: str) -> str:
 def best_take(tts, ear: Ear, text: str, voice: str, speed: float, ph: str | None, log: list) -> np.ndarray:
     base = (ph or tts.tokenizer.phonemize(text, "en-us")).strip()
     # Retries stay near the asked speed, so a slow word stays slow.
-    tries = [(speed, base), (speed + 0.1, base), (speed, first_longer(base)), (speed + 0.1, first_longer(base))]
+    longer = first_longer(base)
+    tries = [(speed, base), (speed + 0.1, base), (speed, longer), (speed + 0.1, longer), (speed + 0.13, base)]
     first = None
     for sp, p in tries:
         audio = say(tts, text, voice, sp, p)
@@ -219,15 +220,20 @@ def best_take(tts, ear: Ear, text: str, voice: str, speed: float, ph: str | None
         if ok:
             if (sp, p) != tries[0]:
                 log.append(f"fixed  {text!r} at speed {sp:.2f} {p}")
-            return audio
-    log.append(f"CHECK  {text!r}: heard {first[1]!r} in every take; kept the first")
-    return first[0]
+            return audio, True
+    log.append(f"CHECK  {text!r} at speed {speed}: heard {first[1]!r} in every take")
+    return first[0], False
 
 
 def record_word(tts, ear: Ear, w: dict, voice: str, out: Path, log: list) -> None:
     ph = WORD_PHONEMES.get(w["w"])
-    mp3(best_take(tts, ear, w["w"], voice, WORD_SPEED, ph, log), out / "w" / f"{w['w']}.mp3", 64)
-    mp3(best_take(tts, ear, w["w"], voice, SLOW_SPEED, ph, log), out / "s" / f"{w['w']}.mp3", 64)
+    word, _ = best_take(tts, ear, w["w"], voice, WORD_SPEED, ph, log)
+    slow, ok = best_take(tts, ear, w["w"], voice, SLOW_SPEED, ph, log)
+    if not ok:  # a clear word beats a slow one that sounds like another word
+        log.append(f"       slow {w['w']!r} plays the normal-speed recording")
+        slow = word
+    mp3(word, out / "w" / f"{w['w']}.mp3", 64)
+    mp3(slow, out / "s" / f"{w['w']}.mp3", 64)
     # Where the sentence reads the word the same wrong way as it does alone, swap in the fix.
     sent = None
     if ph:
@@ -235,10 +241,16 @@ def record_word(tts, ear: Ear, w: dict, voice: str, out: Path, log: list) -> Non
         full = tts.tokenizer.phonemize(w["e"], "en-us")
         if wrong != ph and wrong in full:
             sent = full.replace(wrong, ph)
-    audio = say(tts, w["e"], voice, SENTENCE_SPEED, sent)
-    ok, heard = ear.agrees(audio, w["e"])
-    if not ok:
-        log.append(f"CHECK  sentence of {w['w']!r}: heard {heard!r}")
+    first = None
+    for sp in (SENTENCE_SPEED, SENTENCE_SPEED - 0.05, SENTENCE_SPEED + 0.05):
+        audio = say(tts, w["e"], voice, sp, sent)
+        ok, heard = ear.agrees(audio, w["e"])
+        first = first or (audio, heard)
+        if ok:
+            break
+    else:
+        log.append(f"CHECK  sentence of {w['w']!r}: heard {first[1]!r}")
+        audio = first[0]
     mp3(audio, out / "e" / f"{w['w']}.mp3", 48)
 
 
@@ -262,7 +274,7 @@ def record_all(model_dir: Path, voice: str, out: Path | None = None) -> None:
         if i % 30 == 29:
             print(f"{i + 1} / {len(ws)}", flush=True)
     for k, t in CHEERS.items():
-        mp3(best_take(tts, ear, t, voice, 1.0, None, log), out / "c" / f"{k}.mp3", 64)
+        mp3(best_take(tts, ear, t, voice, 1.0, None, log)[0], out / "c" / f"{k}.mp3", 64)
     (out / "VOICE.txt").write_text(f"Kokoro-82M v1.0 (Apache 2.0), voice {voice}\n", encoding="utf-8")
     (ROOT / "js" / "voice.js").write_text(
         "/* Which recorded voice is in voice/ (written by tools/voice.py all). */\n"
