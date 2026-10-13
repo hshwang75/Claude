@@ -57,6 +57,11 @@ WORD_PHONEMES = {
     "resource": "ɹˈiːsɔːɹs",
     "insightful": "ˈɪnsaɪtfəl",
     "superficial": "sˌuːpɚfˈɪʃəl",
+    # Read alone, the model blurs a few vowels ("toy" came out as "tie"); these spellings keep them.
+    "toy": "tˈoɪ",
+    "noisy": "nˈoɪzi",
+    "vague": "vˈejɡ",
+    "impeccable": "ɪmpˈekəbəl",
 }
 
 
@@ -214,9 +219,11 @@ def first_longer(ph: str) -> str:
 
 def best_take(tts, ear: Ear, text: str, voice: str, speed: float, ph: str | None, log: list) -> np.ndarray:
     base = (ph or tts.tokenizer.phonemize(text, "en-us")).strip()
-    # Retries stay near the asked speed, so a slow word stays slow.
+    # Retries stay near the asked speed, so a slow word stays slow; a word said with "!" or "?"
+    # sometimes keeps a vowel the plain reading blurs (book, bed).
     longer = first_longer(base)
-    tries = [(speed, base), (speed + 0.1, base), (speed, longer), (speed + 0.1, longer), (speed + 0.13, base)]
+    tries = [(speed, base), (speed + 0.1, base), (speed, longer), (speed + 0.1, longer), (speed + 0.13, base),
+             (speed, base + "!"), (speed, base + "?"), (speed + 0.1, base + "!"), (max(speed - 0.1, 0.55), base + "!")]
     first = None
     for sp, p in tries:
         audio = say(tts, text, voice, sp, p)
