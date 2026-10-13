@@ -35,13 +35,66 @@
     try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* storage blocked */ }
   }
 
+  // Can this page keep anything? Some views (private windows, some app previews) refuse or
+  // forget storage; the home screen says so, and the save code still works there.
+  let canSave = false;
+  try {
+    localStorage.setItem(KEY + '-test', '1');
+    canSave = localStorage.getItem(KEY + '-test') === '1';
+    localStorage.removeItem(KEY + '-test');
+  } catch (e) { canSave = false; }
+  // Ask the browser not to clear this site's data on its own (Safari, Chrome, Firefox).
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* not offered */ }
+
+  /* The save code: the whole record as text, to keep in a memo and paste back later or on
+     another device. Words are stored as [box, due day, times right, times wrong]. */
+  const CODE = 'VQ1-';
+  const EPOCH = '2026-01-01';
+  function toCode() {
+    const words = {};
+    for (const w in data.words) {
+      const r = data.words[w];
+      words[w] = [r.box, r.due ? daysBetween(EPOCH, r.due) : null, r.right, r.wrong];
+    }
+    const json = JSON.stringify(Object.assign({}, data, { words }));
+    const bytes = new TextEncoder().encode(json);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return CODE + btoa(bin);
+  }
+  function fromCode(text) {
+    const code = String(text || '').replace(/\s+/g, '');
+    const at = code.indexOf(CODE);
+    if (at < 0) return false;
+    try {
+      const bin = atob(code.slice(at + CODE.length));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const obj = JSON.parse(new TextDecoder().decode(bytes));
+      if (!obj || typeof obj !== 'object' || !obj.words || typeof obj.words !== 'object') return false;
+      const words = {};
+      for (const w in obj.words) {
+        const [box, due, right, wrong] = obj.words[w];
+        const d = new Date(EPOCH + 'T12:00:00');
+        if (due != null) d.setDate(d.getDate() + due);
+        words[w] = { box: +box || 0, due: due == null ? '' : dayKeyOf(d), right: +right || 0, wrong: +wrong || 0 };
+      }
+      data = Object.assign(fresh(), obj, { words });
+      save();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Calendar days in local time. Store.dayOffset lets the check mode pretend days passed.
   let dayOffset = 0;
+  const dayKeyOf = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   function dayKey(plus = 0) {
     const d = new Date();
     d.setHours(12, 0, 0, 0);
     d.setDate(d.getDate() + dayOffset + plus);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    return dayKeyOf(d);
   }
   function daysBetween(a, b) {
     const [y1, m1, d1] = a.split('-').map(Number), [y2, m2, d2] = b.split('-').map(Number);
@@ -126,6 +179,9 @@
       return id;
     },
 
+    get canSave() { return canSave; },
+    toCode,
+    fromCode,
     set(k, v) { data[k] = v; save(); },
     reset() { data = fresh(); save(); },
   };

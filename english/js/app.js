@@ -175,6 +175,7 @@
     const modes = MODES.map((m) => `<button type="button" class="mode" data-act="mode" data-arg="${m.id}" aria-pressed="${d.mode === m.id}">
         <span>${m.name}<small>${m.sub}</small></span></button>`).join('');
     return `<section class="screen has-nav">
+      ${Store.canSave ? '' : '<p class="warn" role="status">이 화면에서는 기록이 저장되지 않아요. 끝내기 전에 스티커 화면에서 <b>기록 코드</b>를 복사해 두세요.</p>'}
       <div class="home-grid">
         <div>
           <div class="hello">
@@ -252,6 +253,14 @@
       <p class="muted">퀴즈를 절반 넘게 맞히면 한 장씩 붙어요. 스피드는 8개부터!</p>
       <p class="stk-name" id="stk-name" aria-live="polite">${have.size ? '스티커를 눌러 보세요' : '첫 스티커를 모아 볼까요?'}</p>
       <div class="album">${cells}</div>
+      <div class="card keep">
+        <span class="label">내 기록 지키기</span>
+        <p class="muted">기록은 이 기기의 이 브라우저에만 저장돼요. <b>기록 코드</b>를 복사해 메모에 넣어 두면, 다른 기기에서나 기록이 지워진 뒤에도 그대로 되살릴 수 있어요.</p>
+        <div class="row2">
+          <button type="button" class="btn" data-act="code-out">기록 코드 복사</button>
+          <button type="button" class="btn" data-act="code-in">기록 코드 붙여넣기</button>
+        </div>
+      </div>
       <p class="foot">영단어 퀘스트 · 버전 ${esc(VERSION)} · 글꼴 ${fontsOK() ? '적용됨' : '기본 글꼴'}<br>
         발음 목소리: ${esc(Sound.voiceName() || '없음')}<br>
         피아노 소리: Salamander Grand Piano (Alexander Holm, CC BY 3.0)<br>
@@ -829,6 +838,61 @@
   }
 
   /* ---------- quit sheet ---------- */
+  function openSheet(inner) {
+    closeSheet();
+    const back = document.createElement('div');
+    back.className = 'sheet-back';
+    back.dataset.act = 'stay';
+    back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" data-act="none">${inner}</div>`;
+    document.body.appendChild(back);
+    return back;
+  }
+
+  function codeOut() {
+    const code = Store.toCode();
+    openSheet(`<h2 id="sheet-t">내 기록 코드</h2>
+      <p>아래 코드를 복사해서 메모 앱이나 카톡 나에게 보내기에 보관하세요.</p>
+      <textarea class="code" id="code-text" readonly rows="5" aria-label="기록 코드">${esc(code)}</textarea>
+      <p class="code-note" id="code-note" aria-live="polite">별 ${Store.data.stars}개 · 스티커 ${Store.data.stickers.length}장 · 공부한 단어 ${Object.keys(Store.data.words).length}개</p>
+      <div class="row2">
+        <button type="button" class="btn" data-act="stay">닫기</button>
+        <button type="button" class="btn go" style="font-size:20px" data-act="code-copy">복사하기</button>
+      </div>`);
+  }
+  function codeCopy() {
+    const box = document.getElementById('code-text');
+    const note = document.getElementById('code-note');
+    const done = () => { note.textContent = '복사했어요! 메모에 붙여 넣어 두세요.'; Sound.pop(); };
+    const pick = () => { box.focus(); box.select(); box.setSelectionRange(0, box.value.length); note.textContent = '코드를 길게 눌러 복사해 주세요.'; };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(box.value).then(done, pick);
+      else pick();
+    } catch (e) { pick(); }
+  }
+  function codeIn() {
+    openSheet(`<h2 id="sheet-t">기록 코드 붙여넣기</h2>
+      <p>보관해 둔 기록 코드를 아래에 붙여 넣으세요. 지금 이 기기의 기록은 코드의 기록으로 바뀌어요.</p>
+      <textarea class="code" id="code-text" rows="5" aria-label="기록 코드" placeholder="VQ1-로 시작하는 코드"></textarea>
+      <p class="code-note" id="code-note" aria-live="polite"></p>
+      <div class="row2">
+        <button type="button" class="btn" data-act="stay">닫기</button>
+        <button type="button" class="btn go" style="font-size:20px" data-act="code-load">불러오기</button>
+      </div>`);
+  }
+  function codeLoad() {
+    const box = document.getElementById('code-text');
+    if (Store.fromCode(box.value)) {
+      Sound.setOn(Store.data.sound);
+      closeSheet();
+      show('stickers');
+      toast('기록을 되살렸어요!', 'calm', 1500);
+      Sound.sticker();
+    } else {
+      document.getElementById('code-note').textContent = '코드가 맞지 않아요. VQ1-로 시작하는 코드를 통째로 붙여 넣어 주세요.';
+      Sound.miss();
+    }
+  }
+
   function askQuit() {
     if (document.querySelector('.sheet-back')) return;
     if (Q && Q.mode === 'speed' && Q.ticker) { Q.paused = Date.now(); }
@@ -890,6 +954,10 @@
     next: () => { Sound.tap(); next(); },
     quit: () => { Sound.tap(); askQuit(); },
     stay: () => { Sound.tap(); closeSheet(); },
+    'code-out': () => { Sound.tap(); codeOut(); },
+    'code-in': () => { Sound.tap(); codeIn(); },
+    'code-copy': () => codeCopy(),
+    'code-load': () => codeLoad(),
     leave: () => { Sound.tap(); closeSheet(); stopTimers(); Q = null; show('home'); },
     stk: (a, b) => {
       const s = Art.stickers[+a];
