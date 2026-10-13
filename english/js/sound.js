@@ -39,6 +39,8 @@
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       load();
       warmVoice();
+      // Preview page: start fetching the word and cheer recordings right away.
+      if (window.VOCAB_VOICE === 'bundles') ['w', 'c'].forEach((k) => fromBundle(k + '/').catch(() => {}));
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
@@ -352,8 +354,24 @@
   const clips = new Map();
   let noClips = !(window.VOCAB_VOICE || window.VOCAB_VOICE_INFO); // no recordings next to the page
   let talking = null;
+  // The one-page preview carries the recordings as four files (voice-w.json ...), each fetched once.
+  const bundles = {};
+  function fromBundle(key) {
+    const kind = key.split('/')[0];
+    bundles[kind] = bundles[kind] || fetch('voice-' + kind + '.json').then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))));
+    bundles[kind].catch(() => { delete bundles[kind]; });
+    return bundles[kind].then((map) => {
+      const b64 = map[key.slice(kind.length + 1)];
+      if (!b64) throw new Error('missing');
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes.buffer;
+    });
+  }
   function clipBytes(key) {
     const inline = window.VOCAB_VOICE;
+    if (inline === 'bundles') return fromBundle(key);
     if (inline) {
       if (!inline[key]) return Promise.reject(new Error('missing'));
       const bin = atob(inline[key]);

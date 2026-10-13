@@ -119,11 +119,15 @@ def build_page(out: Path, debug: bool) -> Path:
     html = html.replace('<script src="fonts/fonts.js"></script>',
                         "<script>\n" + (ROOT / "fonts" / "fonts.js").read_text(encoding="ascii") + "</script>")
     audio = {n: base64.b64encode((ROOT / "audio" / f"{n}.mp3").read_bytes()).decode("ascii") for n in SAMPLES}
-    # The recorded pronunciations (voice/w, s, e, c), keyed the way js/sound.js asks for them.
-    voice = {str(p.relative_to(ROOT / "voice").with_suffix("")): base64.b64encode(p.read_bytes()).decode("ascii")
-             for p in sorted((ROOT / "voice").rglob("*.mp3"))} if (ROOT / "voice").is_dir() else {}
+    # The recorded pronunciations go next to the page as voice-w.json, voice-s.json, voice-e.json
+    # and voice-c.json (publish them with it); js/sound.js fetches each kind the first time it is needed.
+    kinds = sorted(p.name for p in (ROOT / "voice").iterdir() if p.is_dir()) if (ROOT / "voice").is_dir() else []
+    for kind in kinds:
+        bundle = {p.stem: base64.b64encode(p.read_bytes()).decode("ascii") for p in sorted((ROOT / "voice" / kind).glob("*.mp3"))}
+        (out.parent / f"voice-{kind}.json").write_text(json.dumps(bundle), encoding="ascii")
+        print(f"voice-{kind}.json ({len(bundle)} clips)")
     pre = (f"<script>window.VOCAB_AUDIO = {json.dumps(audio)};"
-           + (f" window.VOCAB_VOICE = {json.dumps(voice)};" if voice else "")
+           + (' window.VOCAB_VOICE = "bundles";' if kinds else "")
            + (" window.VOCAB_DEBUG = true;" if debug else "") + "</script>\n")
     for i, src in enumerate(SCRIPTS):
         code = (ROOT / src).read_text(encoding="utf-8")

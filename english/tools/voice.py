@@ -5,6 +5,8 @@
         -> the Kokoro ONNX model and voices from huggingface.co (onnx-community/Kokoro-82M-v1.0-ONNX)
   python3 english/tools/voice.py samples MODEL_DIR OUT_DIR voice[,voice...]
         -> a few words, sentences and cheers in each voice, to pick a voice by ear
+  python3 english/tools/voice.py redo MODEL_DIR VOICE word [word ...]
+        -> records just those words again (after fixing WORD_PHONEMES, say)
   python3 english/tools/voice.py all MODEL_DIR VOICE
         -> english/voice/w/<word>.mp3  the word
            english/voice/s/<word>.mp3  the word, slowly
@@ -39,6 +41,20 @@ CHEERS = {
 }
 
 
+# Words spelled alike but said differently by meaning. Read alone, the speech model picks one
+# meaning; these give the pronunciation that matches the meaning taught in the app.
+WORD_PHONEMES = {
+    "close": "klˈoʊz",           # 닫다 (not 가까운)
+    "increase": "ɪŋkɹˈiːs",      # 증가하다, stress on the second part
+    "graduate": "ɡɹˈædʒuːˌeɪt",  # 졸업하다 (not 졸업생)
+    "elaborate": "ᵻlˈæbɚɹət",    # 정교한 (not 자세히 말하다)
+    # Stress the way the dictionary has it (checked against the CMU Pronouncing Dictionary).
+    "resource": "ɹˈiːsɔːɹs",
+    "insightful": "ˈɪnsaɪtfəl",
+    "superficial": "sˌuːpɚfˈɪʃəl",
+}
+
+
 def words() -> list[dict]:
     out = subprocess.run(
         ["node", "-e", "global.window={};require(process.argv[1]);process.stdout.write(JSON.stringify(window.WORDS))",
@@ -69,9 +85,13 @@ def engine(model_dir: Path, voices: list[str]):
     return Kokoro(str(model_dir / "model.onnx"), str(pack), espeak_config=cfg)
 
 
-def say(tts, text: str, voice: str, speed: float) -> np.ndarray:
+def say(tts, text: str, voice: str, speed: float, phonemes: str | None = None) -> np.ndarray:
     # Voice names start with a for American and b for British speakers.
-    audio, sr = tts.create(text, voice=voice, speed=speed, lang="en-gb" if voice.startswith("b") else "en-us")
+    lang = "en-gb" if voice.startswith("b") else "en-us"
+    if phonemes:
+        audio, sr = tts.create(phonemes, voice=voice, speed=speed, lang=lang, is_phonemes=True)
+    else:
+        audio, sr = tts.create(text, voice=voice, speed=speed, lang=lang)
     assert sr == RATE
     audio = np.asarray(audio, dtype=np.float32)
     # Even loudness from clip to clip, with a little air before and after.
@@ -103,14 +123,34 @@ def samples(model_dir: Path, out_dir: Path, voices: list[str]) -> None:
         print("samples", v)
 
 
+def record_word(tts, w: dict, voice: str, out: Path) -> None:
+    ph = WORD_PHONEMES.get(w["w"])
+    mp3(say(tts, w["w"], voice, WORD_SPEED, ph), out / "w" / f"{w['w']}.mp3")
+    mp3(say(tts, w["w"], voice, SLOW_SPEED, ph), out / "s" / f"{w['w']}.mp3")
+    # Where the sentence reads the word the same wrong way as it does alone, swap in the fix.
+    sent = None
+    if ph:
+        wrong = tts.tokenizer.phonemize(w["w"], "en-us").strip()
+        full = tts.tokenizer.phonemize(w["e"], "en-us")
+        if wrong != ph and wrong in full:
+            sent = full.replace(wrong, ph)
+    mp3(say(tts, w["e"], voice, SENTENCE_SPEED, sent), out / "e" / f"{w['w']}.mp3")
+
+
+def record_some(model_dir: Path, voice: str, names: list[str]) -> None:
+    tts = engine(model_dir, [voice])
+    by = {w["w"]: w for w in words()}
+    for n in names:
+        record_word(tts, by[n], voice, ROOT / "voice")
+        print("re-recorded", n)
+
+
 def record_all(model_dir: Path, voice: str) -> None:
     tts = engine(model_dir, [voice])
     out = ROOT / "voice"
     ws = words()
     for i, w in enumerate(ws):
-        mp3(say(tts, w["w"], voice, WORD_SPEED), out / "w" / f"{w['w']}.mp3")
-        mp3(say(tts, w["w"], voice, SLOW_SPEED), out / "s" / f"{w['w']}.mp3")
-        mp3(say(tts, w["e"], voice, SENTENCE_SPEED), out / "e" / f"{w['w']}.mp3")
+        record_word(tts, w, voice, out)
         if i % 30 == 29:
             print(f"{i + 1} / {len(ws)}")
     for k, t in CHEERS.items():
@@ -131,6 +171,8 @@ if __name__ == "__main__":
         samples(Path(a[1]), Path(a[2]), a[3].split(","))
     elif a[:1] == ["all"] and len(a) == 3:
         record_all(Path(a[1]), a[2])
+    elif a[:1] == ["redo"] and len(a) >= 4:
+        record_some(Path(a[1]), a[2], a[3:])
     else:
         print(__doc__)
         sys.exit(1)
