@@ -84,6 +84,41 @@
         mouth = `<path d="M41 75 q4 -3 8 0 q4 3 8 0" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>`;
         extra = `<path d="M84 30 q5 8 0 12 q-5 -4 0 -12z" fill="${C.sky}" stroke="${C.skyDeep}" stroke-width="1.5"/>`;
         break;
+      case 'love': {
+        const h = (x) => `<path d="M${x} 61 C${x - 9} 55 ${x - 8} 48 ${x - 3.5} 49 C${x - 1.5} 49 ${x} 51 ${x} 52 C${x} 51 ${x + 1.5} 49 ${x + 3.5} 49 C${x + 8} 48 ${x + 9} 55 ${x} 61 Z" fill="#e8778a"/>`;
+        eyes = h(36) + h(64);
+        mouth = `<path d="M42 71 Q50 81 58 71 Z" fill="#e8778a" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`;
+        break;
+      }
+      case 'wink':
+        eyes = `<circle cx="36" cy="57" r="3.6" fill="${INK}"/><path d="M58 58 q6 -7 12 0" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`;
+        mouth = `<path d="M42 72 q8 7 16 0" fill="none" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>`;
+        extra = sparkle(86, 30, C.yellow);
+        break;
+      case 'shy':
+        eyes = `<path d="M31 59 q5 3 10 0M59 59 q5 3 10 0" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`;
+        mouth = `<path d="M45 74 q2.5 -2 5 0 q2.5 2 5 0" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>`;
+        extra = `<ellipse cx="27" cy="69" rx="8" ry="5" fill="${C.blush}" opacity=".9"/><ellipse cx="73" cy="69" rx="8" ry="5" fill="${C.blush}" opacity=".9"/><path d="M14 64 l4 -3M15 70 l4 -2M86 64 l-4 -3M85 70 l-4 -2" stroke="#e8778a" stroke-width="1.8" stroke-linecap="round"/>`;
+        break;
+      case 'calm':
+        eyes = `<path d="M30 57 q6 5 12 0M58 57 q6 5 12 0" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`;
+        mouth = `<path d="M45 73 q5 4 10 0" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>`;
+        extra = `<path d="M8 30 q6 -4 12 0M80 26 q6 -4 12 0" fill="none" stroke="${C.skyDeep}" stroke-width="2" stroke-linecap="round"/>`;
+        break;
+      case 'bored':
+        eyes = `<path d="M30 55 h12M58 55 h12" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/><path d="M32 56 a4 3.6 0 0 0 8 0Z M60 56 a4 3.6 0 0 0 8 0Z" fill="${INK}"/>`;
+        mouth = `<path d="M44 75 h12" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>`;
+        break;
+      case 'confused':
+        eyes = `<path d="M36 57 m-1.5 0 a1.5 1.5 0 1 1 3 0 a3 3 0 1 1 -6 0 a4.5 4.5 0 1 1 9 0M64 57 m-1.5 0 a1.5 1.5 0 1 1 3 0 a3 3 0 1 1 -6 0 a4.5 4.5 0 1 1 9 0" fill="none" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`;
+        mouth = `<path d="M41 75 q3 -3 6 0 q3 3 6 0 q3 -3 6 0" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>`;
+        extra = `<text x="80" y="24" font-family="Fredoka, sans-serif" font-size="18" font-weight="600" fill="${C.lilacDeep}">?</text><text x="10" y="30" font-family="Fredoka, sans-serif" font-size="13" font-weight="600" fill="${C.lilacDeep}">?</text>`;
+        break;
+      case 'determined':
+        eyes = dots(58, 3.6) + `<path d="M28 49 l11 4M72 49 l-11 4" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`;
+        mouth = `<path d="M43 74 q7 3 14 0" fill="none" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>`;
+        extra = `<path d="M84 14 q6 6 2 12 q8 -2 8 -10 q-2 -6 -10 -2z" fill="${C.peach}" stroke="${C.peachDeep}" stroke-width="1.8" stroke-linejoin="round"/>`;
+        break;
       default:
         break;
     }
@@ -116,11 +151,12 @@
       <path d="M51 80 Q66 70 74 78 Q62 88 51 80Z" fill="${C.mint}" stroke="${C.mintDeep}" stroke-width="3"/>
       ${[0, 72, 144, 216, 288].map((a) => { const r = (a - 90) * Math.PI / 180; return `<circle cx="${(50 + Math.cos(r) * 17).toFixed(1)}" cy="${(40 + Math.sin(r) * 17).toFixed(1)}" r="13" fill="${C.pink}" stroke="${C.pinkDeep}" stroke-width="3"/>`; }).join('')}
       <circle cx="50" cy="40" r="10" fill="${C.yellow}" stroke="${C.yellowDeep}" stroke-width="3"/>`,
-    tree: () => `<path d="M44 92 L46 58 L54 58 L56 92 Z" fill="${C.brown}" stroke="${C.brownDeep}" stroke-width="3" stroke-linejoin="round"/>
-      <circle cx="50" cy="38" r="24" fill="${C.mint}" stroke="${C.mintDeep}" stroke-width="3"/>
-      <circle cx="30" cy="52" r="15" fill="${C.mint}" stroke="${C.mintDeep}" stroke-width="3"/>
-      <circle cx="70" cy="52" r="15" fill="${C.mint}" stroke="${C.mintDeep}" stroke-width="3"/>
-      <circle cx="40" cy="36" r="4" fill="${C.pink}"/><circle cx="62" cy="46" r="4" fill="${C.pink}"/><circle cx="54" cy="26" r="4" fill="${C.pink}"/>`,
+    tree: () => `<path d="M42 92 Q46 80 45 64 H55 Q54 80 58 92 Z" fill="${C.brown}" stroke="${C.brownDeep}" stroke-width="3" stroke-linejoin="round"/>
+      ${['circle cx="50" cy="30" r="20"', 'circle cx="30" cy="44" r="17"', 'circle cx="70" cy="44" r="17"', 'circle cx="40" cy="58" r="14"', 'circle cx="60" cy="58" r="14"'].map((c) => `<${c} fill="${C.mintDeep}" stroke="${C.mintDeep}" stroke-width="6"/>`).join('')}
+      ${['circle cx="50" cy="30" r="20"', 'circle cx="30" cy="44" r="17"', 'circle cx="70" cy="44" r="17"', 'circle cx="40" cy="58" r="14"', 'circle cx="60" cy="58" r="14"'].map((c) => `<${c} fill="${C.mint}"/>`).join('')}
+      <path d="M36 22 q6 -8 16 -8" fill="none" stroke="#d7f3d2" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="34" cy="44" r="5" fill="${C.pink}" stroke="${C.pinkDeep}" stroke-width="1.5"/><circle cx="62" cy="34" r="5" fill="${C.pink}" stroke="${C.pinkDeep}" stroke-width="1.5"/><circle cx="56" cy="56" r="5" fill="${C.pink}" stroke="${C.pinkDeep}" stroke-width="1.5"/>
+      <path d="M44 80 q6 -4 12 0" fill="none" stroke="${C.brownDeep}" stroke-width="2" stroke-linecap="round"/>`,
     sun: () => `${Array.from({ length: 10 }, (_, i) => { const a = i * Math.PI / 5; return `<path d="M${(50 + Math.cos(a) * 30).toFixed(1)} ${(50 + Math.sin(a) * 30).toFixed(1)} L${(50 + Math.cos(a) * 43).toFixed(1)} ${(50 + Math.sin(a) * 43).toFixed(1)}" stroke="${C.peachDeep}" stroke-width="5" stroke-linecap="round"/>`; }).join('')}
       <circle cx="50" cy="50" r="24" fill="${C.yellow}" stroke="${C.yellowDeep}" stroke-width="4"/>${smile(50, 48)}
       <ellipse cx="38" cy="56" rx="4" ry="2.6" fill="${C.blush}"/><ellipse cx="62" cy="56" rx="4" ry="2.6" fill="${C.blush}"/>`,
@@ -172,10 +208,11 @@
       <path d="M72 50 L92 34 L90 66 Z" fill="${C.peach}" stroke="${C.peachDeep}" stroke-width="4" stroke-linejoin="round"/>
       <circle cx="34" cy="46" r="4" fill="${INK}"/><path d="M46 38 Q52 50 46 62" stroke="${C.peachDeep}" stroke-width="3" fill="none"/>
       <circle cx="16" cy="28" r="4" fill="none" stroke="${C.skyDeep}" stroke-width="2.5"/><circle cx="10" cy="16" r="3" fill="none" stroke="${C.skyDeep}" stroke-width="2.5"/>`,
-    ball: () => `<circle cx="50" cy="50" r="38" fill="${C.white}" stroke="${C.pinkDeep}" stroke-width="4"/>
-      <path d="M50 12 Q30 50 50 88" fill="none" stroke="${C.pinkDeep}" stroke-width="3"/>
-      <path d="M14 40 Q50 30 86 40M14 62 Q50 72 86 62" fill="none" stroke="${C.skyDeep}" stroke-width="3"/>
-      <path d="M50 12 A38 38 0 0 1 88 50 L50 50 Z" fill="${C.yellow}" opacity=".6"/>`,
+    ball: () => { const cols = [C.pink, C.yellow, C.sky, C.mint, C.lilac, C.peach]; let d = '';
+      for (let i = 0; i < 6; i++) { const a0 = (i * 60 - 90) * Math.PI / 180, a1 = ((i + 1) * 60 - 90) * Math.PI / 180;
+        d += `<path d="M50 52 L${(50 + Math.cos(a0) * 38).toFixed(1)} ${(52 + Math.sin(a0) * 38).toFixed(1)} A38 38 0 0 1 ${(50 + Math.cos(a1) * 38).toFixed(1)} ${(52 + Math.sin(a1) * 38).toFixed(1)} Z" fill="${cols[i]}"/>`; }
+      return `${d}<circle cx="50" cy="52" r="38" fill="none" stroke="${C.pinkDeep}" stroke-width="4"/><circle cx="50" cy="52" r="8" fill="#fff" stroke="${C.pinkDeep}" stroke-width="2.5"/>
+        <path d="M24 38 q8 -14 22 -18" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".8"/><ellipse cx="50" cy="95" rx="26" ry="3" fill="#e8dccb"/>`; },
     cake: () => `<rect x="18" y="48" width="64" height="38" rx="8" fill="${C.pink}" stroke="${C.pinkDeep}" stroke-width="4"/>
       <path d="M18 58 q8 8 16 0 q8 8 16 0 q8 8 16 0 q8 8 16 0" fill="${C.white}" stroke="${C.pinkDeep}" stroke-width="3"/>
       <rect x="46" y="24" width="8" height="24" rx="3" fill="${C.sky}" stroke="${C.skyDeep}" stroke-width="3"/>
@@ -244,13 +281,31 @@
       <path d="M6 80 Q10 70 20 74 Q28 68 32 78 Q34 86 20 86 Q6 88 6 80Z M68 80 Q72 70 82 74 Q90 68 94 78 Q96 86 82 86 Q68 88 68 80Z" fill="${C.white}" stroke="${C.skyDeep}" stroke-width="3" stroke-linejoin="round"/>`,
   };
 
-  function svg(key, size = 96, label = '') {
-    let body;
-    if (key && key.startsWith('cat:')) body = cat(key.slice(4));
-    else body = (PICS[key] || (() => cat('teacher')))();
-    const a11y = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
-    return `<svg class="doodle" viewBox="0 0 100 100" width="${size}" height="${size}" ${a11y}><g filter="url(#wob)">${body}</g></svg>`;
+  // Extra pictures and cat accessories live in js/pics.js; they register here.
+  const ACCESSORY = {};
+
+  // key: a picture name ('apple'), a cat ('cat:happy'), a cat with something on ('cat:happy/crown'),
+  // or a cat with a small picture beside it ('cat:thinking+magnifier'). Combinations work too.
+  function draw(key) {
+    if (!key || !key.startsWith('cat:')) return (PICS[key] || (() => cat('thinking')))();
+    const [head, prop] = key.slice(4).split('+');
+    const [mood, ...wear] = head.split('/');
+    const body = cat(mood) + wear.map((w) => (ACCESSORY[w] ? ACCESSORY[w]() : '')).join('');
+    if (!prop || !PICS[prop]) return body;
+    return `<g transform="translate(-2 18) scale(0.84)">${body}</g><g transform="translate(60 -1) scale(0.42)">${PICS[prop]()}</g>`;
   }
+
+  function svg(key, size = 96, label = '') {
+    const a11y = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
+    return `<svg class="doodle" viewBox="0 0 100 100" width="${size}" height="${size}" ${a11y}><g filter="url(#wob)">${draw(key)}</g></svg>`;
+  }
+  const has = (key) => {
+    if (!key) return false;
+    if (!key.startsWith('cat:')) return !!PICS[key];
+    const [head, prop] = key.slice(4).split('+');
+    const [, ...wear] = head.split('/');
+    return wear.every((w) => ACCESSORY[w]) && (!prop || !!PICS[prop]);
+  };
 
   /* ---------- stickers: one for each finished quiz ---------- */
   const STICKER_ART = [
@@ -266,5 +321,5 @@
   const STICKER_BG = ['#ffe7ec', '#fff3c4', '#e6f7e4', '#e3f1fc', '#f3e8fb', '#ffe9d6'];
   const stickers = STICKER_ART.map(([art, name], i) => ({ id: i, art, name, bg: STICKER_BG[i % STICKER_BG.length] }));
 
-  window.Art = { svg, cat, stickers };
+  window.Art = { svg, cat, stickers, has, PICS, ACCESSORY, C, INK, sparkle, star5, smile };
 })();

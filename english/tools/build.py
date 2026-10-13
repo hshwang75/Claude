@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPTS = ["js/words.js", "js/art.js", "js/voice.js", "js/sound.js", "js/store.js", "js/app.js"]
+SCRIPTS = ["js/words.js", "js/art.js", "js/pics.js", "js/voice.js", "js/sound.js", "js/store.js", "js/app.js"]
 ZIP_FILES = ["index.html", "manifest.webmanifest", "css", "js", "fonts", "audio", "icons"]
 SAMPLES = ["C4", "C5", "Ds5", "Fs5", "A5", "C6", "Ds6", "Fs6", "A6", "C7"]
 FONTS = [

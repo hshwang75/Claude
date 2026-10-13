@@ -379,10 +379,8 @@
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       return Promise.resolve(bytes.buffer);
     }
-    return fetch('voice/' + key + '.mp3').then((r) => {
-      if (r.status === 404) noClips = true;
-      return r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status));
-    });
+    // A missing clip falls back to the device voice for that one word only.
+    return fetch('voice/' + key + '.mp3').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))));
   }
   function clip(key) {
     if (clips.has(key)) return clips.get(key);

@@ -92,9 +92,9 @@ def engine(model_dir: Path, voices: list[str]):
 
 # Kokoro tends to put a short "uh" in front of whatever starts a recording ("clock" came out as
 # "a clock", "sing" as "a thing"): it sits in the time the model gives the start marker. So every
-# clip is spoken after a lead-in word and a pause ("Now. clock."), and the model's own timing for
-# each sound says exactly where the word begins; everything before that is cut away.
-LEAD = "nˈaʊ. "
+# clip is spoken after a lead-in word and a pause ("Okay. clock."), and the model's own timing for
+# each sound says where the pause is; the clip starts at the quietest moment of that pause.
+LEAD = "oʊkˈeɪ. "  # "Okay." leaves the deepest silence before the word (measured against "Now.", "Hmm." ...)
 FRAME = RATE // 100  # 10 ms
 
 
@@ -131,8 +131,13 @@ def say(tts, text: str, voice: str, speed: float, phonemes: str | None = None) -
     audio, dur = timed(tts, lead + body, voice, speed)
     assert len(dur) == len(lead) + len(body) + 2, "this model does not report timings"
     per_frame = len(audio) / dur.sum()
-    start = int(dur[: 1 + len(lead)].sum() * per_frame) - FRAME * 2  # 20 ms into the pause
-    audio = trim_tail(audio[start:])
+    pause_from = int(dur[: 1 + len(lead) - 2].sum() * per_frame)  # the lead's "." and space
+    word_at = int(dur[: 1 + len(lead)].sum() * per_frame)
+    db = frame_db(audio[pause_from:word_at])
+    start = pause_from + int(np.argmin(db)) * FRAME if len(db) else word_at - FRAME * 2
+    audio = trim_tail(audio[start:]).copy()
+    fade = np.linspace(0, 1, RATE // 200, dtype=np.float32)  # 5 ms, so the cut never clicks
+    audio[: len(fade)] *= fade
     # Even loudness from clip to clip, with a little air before and after.
     rms = float(np.sqrt(np.mean(audio ** 2))) or 1.0
     audio = audio * (0.1 / rms)
