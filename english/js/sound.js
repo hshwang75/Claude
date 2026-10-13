@@ -294,13 +294,27 @@
 
   /* ---------- the English voice ---------- */
   let voice = null;
+  // Rank the voices the device has. The high-quality downloads (Premium, Enhanced, Natural)
+  // sound far less robotic than the small built-in ones; novelty voices are never used.
+  const NOVELTY = /Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Fred|Junior|Ralph|Kathy|Grandma|Grandpa|Rocko|Shelley|Flo|Eddy|Reed|Sandy/;
+  const GOOD = /Ava|Zoe|Evan|Nathan|Allison|Susan|Samantha|Joelle|Noelle|Aria|Jenny|Guy|Michelle|Emma|Google US English/;
+  function voiceScore(v) {
+    if (!/^en/i.test(v.lang) || NOVELTY.test(v.name)) return -1;
+    let s = /^en[-_]US/i.test(v.lang) ? 3 : 1;
+    if (/Premium/i.test(v.name)) s += 8;
+    if (/Natural|Neural/i.test(v.name)) s += 7;
+    if (/Enhanced/i.test(v.name)) s += 6;
+    if (GOOD.test(v.name)) s += 2;
+    return s;
+  }
   function pickVoice() {
     if (!('speechSynthesis' in window)) return;
-    const all = speechSynthesis.getVoices();
-    const us = all.filter((v) => /^en[-_]US/i.test(v.lang));
-    const liked = ['Samantha', 'Google US English', 'Aria', 'Jenny', 'Ava', 'Allison', 'Susan', 'Zira'];
-    voice = liked.map((n) => us.find((v) => v.name.includes(n))).find(Boolean)
-      || us.find((v) => v.localService) || us[0] || all.find((v) => /^en/i.test(v.lang)) || null;
+    let best = null, top = -1;
+    for (const v of speechSynthesis.getVoices()) {
+      const s = voiceScore(v);
+      if (s > top) { top = s; best = v; }
+    }
+    voice = best;
   }
   if ('speechSynthesis' in window) {
     pickVoice();
@@ -317,6 +331,7 @@
   }
 
   Sound.canSpeak = 'speechSynthesis' in window;
+  Sound.voiceName = () => { if (!voice) pickVoice(); return voice ? voice.name : ''; };
   Sound.speak = function (text, slow) {
     if (!Sound.canSpeak) return false;
     try {

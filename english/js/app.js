@@ -253,6 +253,7 @@
       <p class="stk-name" id="stk-name" aria-live="polite">${have.size ? '스티커를 눌러 보세요' : '첫 스티커를 모아 볼까요?'}</p>
       <div class="album">${cells}</div>
       <p class="foot">영단어 퀘스트 · 버전 ${esc(VERSION)} · 글꼴 ${fontsOK() ? '적용됨' : '기본 글꼴'}<br>
+        발음 목소리: ${esc(Sound.voiceName() || '없음')}<br>
         피아노 소리: Salamander Grand Piano (Alexander Holm, CC BY 3.0)<br>
         글꼴: Jua · Gowun Dodum · Fredoka (SIL Open Font License)</p>
       <div class="spacer"></div>
