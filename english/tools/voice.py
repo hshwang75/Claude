@@ -7,15 +7,18 @@
         -> a few words, sentences and cheers in each voice, to pick a voice by ear
   python3 english/tools/voice.py redo MODEL_DIR VOICE word [word ...]
         -> records just those words again (after fixing WORD_PHONEMES, say)
-  python3 english/tools/voice.py all MODEL_DIR VOICE
+  python3 english/tools/voice.py all MODEL_DIR VOICE [OUT_DIR]
         -> english/voice/w/<word>.mp3  the word
            english/voice/s/<word>.mp3  the word, slowly
            english/voice/e/<word>.mp3  the example sentence
            english/voice/c/<name>.mp3  the cat teacher's cheers
 
-Needs: pip install kokoro-onnx soundfile, and ffmpeg with libmp3lame.
+Needs: pip install kokoro-onnx soundfile, and ffmpeg with libmp3lame. With faster-whisper installed
+every clip is also checked by ear (Whisper small.en) and re-made when it is heard as another word.
 """
+import difflib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +27,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 HF = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main"
+# The same model exported to also report how long each sound lasts; used to cut clips exactly.
+HF_TIMED = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX-timestamped/resolve/main"
 RATE = 24000
 WORD_SPEED, SLOW_SPEED, SENTENCE_SPEED = 0.9, 0.62, 0.95
 # Short lines the cat teacher says. The key is the file name, used by js/sound.js.
@@ -64,13 +69,13 @@ def words() -> list[dict]:
 
 def fetch(model_dir: Path, voices: list[str]) -> None:
     model_dir.mkdir(parents=True, exist_ok=True)
-    wanted = [("onnx/model.onnx", model_dir / "model.onnx")]
-    wanted += [(f"voices/{v}.bin", model_dir / f"{v}.bin") for v in voices]
+    wanted = [(f"{HF_TIMED}/onnx/model.onnx", model_dir / "model-ts.onnx")]
+    wanted += [(f"{HF}/voices/{v}.bin", model_dir / f"{v}.bin") for v in voices]
     for src, dst in wanted:
         if dst.exists() and dst.stat().st_size > 0:
             continue
         print("download", src)
-        subprocess.run(["curl", "-fL", "--retry", "3", "-o", str(dst), f"{HF}/{src}"], check=True)
+        subprocess.run(["curl", "-fL", "--retry", "3", "-o", str(dst), src], check=True)
 
 
 def engine(model_dir: Path, voices: list[str]):
@@ -82,18 +87,52 @@ def engine(model_dir: Path, voices: list[str]):
     if not pack.exists():
         np.savez(pack, **{v: np.fromfile(model_dir / f"{v}.bin", dtype=np.float32).reshape(-1, 1, 256) for v in voices})
     cfg = EspeakConfig(lib_path=espeakng_loader.get_library_path(), data_path=espeakng_loader.get_data_path())
-    return Kokoro(str(model_dir / "model.onnx"), str(pack), espeak_config=cfg)
+    return Kokoro(str(model_dir / "model-ts.onnx"), str(pack), espeak_config=cfg)
+
+
+# Kokoro tends to put a short "uh" in front of whatever starts a recording ("clock" came out as
+# "a clock", "sing" as "a thing"): it sits in the time the model gives the start marker. So every
+# clip is spoken after a lead-in word and a pause ("Now. clock."), and the model's own timing for
+# each sound says exactly where the word begins; everything before that is cut away.
+LEAD = "nˈaʊ. "
+FRAME = RATE // 100  # 10 ms
+
+
+def frame_db(audio: np.ndarray) -> np.ndarray:
+    n = len(audio) // FRAME
+    a = audio[: n * FRAME].reshape(n, FRAME)
+    return 20 * np.log10(np.sqrt(np.mean(a ** 2, axis=1)) + 1e-9)
+
+
+def trim_tail(audio: np.ndarray) -> np.ndarray:
+    db = frame_db(audio)
+    on = np.nonzero(db > -55)[0]
+    return audio[: (on[-1] + 2) * FRAME] if len(on) else audio
+
+
+def timed(tts, tokens: list[int], voice: str, speed: float) -> tuple[np.ndarray, np.ndarray]:
+    """Audio plus, for the start marker, each token and the end marker, its length in frames."""
+    style = tts._style_for(tts.get_voice_style(voice), len(tokens))
+    audio, durations = tts.sess.run(None, {
+        "input_ids": np.array([[0, *tokens, 0]], dtype=np.int64),
+        "style": np.asarray(style, dtype=np.float32),
+        "speed": np.array([speed], dtype=np.float32),
+    })
+    return np.asarray(audio, dtype=np.float32).ravel(), np.asarray(durations, dtype=float).ravel()
 
 
 def say(tts, text: str, voice: str, speed: float, phonemes: str | None = None) -> np.ndarray:
     # Voice names start with a for American and b for British speakers.
     lang = "en-gb" if voice.startswith("b") else "en-us"
-    if phonemes:
-        audio, sr = tts.create(phonemes, voice=voice, speed=speed, lang=lang, is_phonemes=True)
-    else:
-        audio, sr = tts.create(text, voice=voice, speed=speed, lang=lang)
-    assert sr == RATE
-    audio = np.asarray(audio, dtype=np.float32)
+    ph = (phonemes or tts.tokenizer.phonemize(text, lang)).strip()
+    if ph[-1] not in ".!?":
+        ph += "."
+    lead, body = tts.tokenizer.tokenize(LEAD), tts.tokenizer.tokenize(ph)
+    audio, dur = timed(tts, lead + body, voice, speed)
+    assert len(dur) == len(lead) + len(body) + 2, "this model does not report timings"
+    per_frame = len(audio) / dur.sum()
+    start = int(dur[: 1 + len(lead)].sum() * per_frame) - FRAME * 2  # 20 ms into the pause
+    audio = trim_tail(audio[start:])
     # Even loudness from clip to clip, with a little air before and after.
     rms = float(np.sqrt(np.mean(audio ** 2))) or 1.0
     audio = audio * (0.1 / rms)
@@ -123,10 +162,72 @@ def samples(model_dir: Path, out_dir: Path, voices: list[str]) -> None:
         print("samples", v)
 
 
-def record_word(tts, w: dict, voice: str, out: Path) -> None:
+class Ear:
+    """Listens to each new clip with Whisper (an open speech recognizer) and says whether it
+    hears the intended words. Optional: without faster-whisper installed every clip passes."""
+
+    def __init__(self, tts):
+        self.tts = tts
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError:
+            print("faster-whisper not installed: clips are not checked by ear")
+            self.model = None
+            return
+        self.model = WhisperModel("small.en", device="cpu", compute_type="int8")
+
+    def hear(self, audio: np.ndarray) -> str:
+        # Whisper listens at 16 kHz; ffmpeg's resampler keeps the s and f sounds intact.
+        x16 = np.frombuffer(subprocess.run(
+            ["ffmpeg", "-loglevel", "error", "-f", "f32le", "-ar", str(RATE), "-ac", "1", "-i", "pipe:",
+             "-f", "f32le", "-ar", "16000", "pipe:"], input=audio.astype(np.float32).tobytes(),
+            capture_output=True, check=True).stdout, dtype=np.float32)
+        segs, _ = self.model.transcribe(x16, language="en", beam_size=5, without_timestamps=True)
+        return " ".join(seg.text.strip() for seg in segs)
+
+    def sounds(self, words: list[str]) -> str:
+        ph = self.tts.tokenizer.phonemize(" ".join(words), "en-us")
+        return "".join(c for c in ph if c not in "ˈˌ ː")
+
+    def agrees(self, audio: np.ndarray, target: str) -> tuple[bool, str]:
+        if self.model is None:
+            return True, ""
+        heard = self.hear(audio)
+        norm = lambda t: re.sub(r"[^a-z' ]", " ", t.lower().replace("-", " ")).split()
+        a, b = norm(heard), norm(target)
+        if a == b or (a and self.sounds(a) == self.sounds(b)):  # same words, or words that sound alike
+            return True, heard
+        if len(b) > 2:  # a sentence: allow one small slip of the recognizer
+            return difflib.SequenceMatcher(None, a, b).ratio() >= 0.9, heard
+        return False, heard
+
+
+def first_longer(ph: str) -> str:
+    """Hold the first sound a little longer (s -> ss), which keeps a soft first sound from fading."""
+    return ph[0] + ph if ph[0] not in "ˈˌ" else ph
+
+
+def best_take(tts, ear: Ear, text: str, voice: str, speed: float, ph: str | None, log: list) -> np.ndarray:
+    base = (ph or tts.tokenizer.phonemize(text, "en-us")).strip()
+    # Retries stay near the asked speed, so a slow word stays slow.
+    tries = [(speed, base), (speed + 0.1, base), (speed, first_longer(base)), (speed + 0.1, first_longer(base))]
+    first = None
+    for sp, p in tries:
+        audio = say(tts, text, voice, sp, p)
+        ok, heard = ear.agrees(audio, text)
+        first = first if first is not None else (audio, heard)
+        if ok:
+            if (sp, p) != tries[0]:
+                log.append(f"fixed  {text!r} at speed {sp:.2f} {p}")
+            return audio
+    log.append(f"CHECK  {text!r}: heard {first[1]!r} in every take; kept the first")
+    return first[0]
+
+
+def record_word(tts, ear: Ear, w: dict, voice: str, out: Path, log: list) -> None:
     ph = WORD_PHONEMES.get(w["w"])
-    mp3(say(tts, w["w"], voice, WORD_SPEED, ph), out / "w" / f"{w['w']}.mp3")
-    mp3(say(tts, w["w"], voice, SLOW_SPEED, ph), out / "s" / f"{w['w']}.mp3")
+    mp3(best_take(tts, ear, w["w"], voice, WORD_SPEED, ph, log), out / "w" / f"{w['w']}.mp3", 64)
+    mp3(best_take(tts, ear, w["w"], voice, SLOW_SPEED, ph, log), out / "s" / f"{w['w']}.mp3", 64)
     # Where the sentence reads the word the same wrong way as it does alone, swap in the fix.
     sent = None
     if ph:
@@ -134,33 +235,41 @@ def record_word(tts, w: dict, voice: str, out: Path) -> None:
         full = tts.tokenizer.phonemize(w["e"], "en-us")
         if wrong != ph and wrong in full:
             sent = full.replace(wrong, ph)
-    mp3(say(tts, w["e"], voice, SENTENCE_SPEED, sent), out / "e" / f"{w['w']}.mp3")
+    audio = say(tts, w["e"], voice, SENTENCE_SPEED, sent)
+    ok, heard = ear.agrees(audio, w["e"])
+    if not ok:
+        log.append(f"CHECK  sentence of {w['w']!r}: heard {heard!r}")
+    mp3(audio, out / "e" / f"{w['w']}.mp3", 48)
 
 
 def record_some(model_dir: Path, voice: str, names: list[str]) -> None:
     tts = engine(model_dir, [voice])
+    ear, log = Ear(tts), []
     by = {w["w"]: w for w in words()}
     for n in names:
-        record_word(tts, by[n], voice, ROOT / "voice")
+        record_word(tts, ear, by[n], voice, ROOT / "voice", log)
         print("re-recorded", n)
+    print("\n".join(log))
 
 
-def record_all(model_dir: Path, voice: str) -> None:
+def record_all(model_dir: Path, voice: str, out: Path | None = None) -> None:
     tts = engine(model_dir, [voice])
-    out = ROOT / "voice"
+    ear, log = Ear(tts), []
+    out = out or ROOT / "voice"
     ws = words()
     for i, w in enumerate(ws):
-        record_word(tts, w, voice, out)
+        record_word(tts, ear, w, voice, out, log)
         if i % 30 == 29:
-            print(f"{i + 1} / {len(ws)}")
+            print(f"{i + 1} / {len(ws)}", flush=True)
     for k, t in CHEERS.items():
-        mp3(say(tts, t, voice, 1.0), out / "c" / f"{k}.mp3", 48)
+        mp3(best_take(tts, ear, t, voice, 1.0, None, log), out / "c" / f"{k}.mp3", 64)
     (out / "VOICE.txt").write_text(f"Kokoro-82M v1.0 (Apache 2.0), voice {voice}\n", encoding="utf-8")
     (ROOT / "js" / "voice.js").write_text(
         "/* Which recorded voice is in voice/ (written by tools/voice.py all). */\n"
         f"window.VOCAB_VOICE_INFO = {json.dumps({'model': 'Kokoro-82M v1.0', 'voice': voice})};\n", encoding="utf-8")
     total = sum(p.stat().st_size for p in out.rglob("*.mp3"))
-    print(f"done: {len(ws) * 3 + len(CHEERS)} clips, {total // 1024} KB")
+    print("\n".join(log))
+    print(f"done: {len(ws) * 3 + len(CHEERS)} clips, {total // 1024} KB", flush=True)
 
 
 if __name__ == "__main__":
@@ -169,8 +278,8 @@ if __name__ == "__main__":
         fetch(Path(a[1]), a[2:] or ["af_heart"])
     elif a[:1] == ["samples"] and len(a) == 4:
         samples(Path(a[1]), Path(a[2]), a[3].split(","))
-    elif a[:1] == ["all"] and len(a) == 3:
-        record_all(Path(a[1]), a[2])
+    elif a[:1] == ["all"] and len(a) in (3, 4):
+        record_all(Path(a[1]), a[2], Path(a[3]) if len(a) == 4 else None)
     elif a[:1] == ["redo"] and len(a) >= 4:
         record_some(Path(a[1]), a[2], a[3:])
     else:
