@@ -330,10 +330,9 @@
     } catch (e) { /* no voice */ }
   }
 
-  Sound.canSpeak = 'speechSynthesis' in window;
-  Sound.voiceName = () => { if (!voice) pickVoice(); return voice ? voice.name : ''; };
-  Sound.speak = function (text, slow) {
-    if (!Sound.canSpeak) return false;
+  const hasDeviceVoice = 'speechSynthesis' in window;
+  function deviceSpeak(text, slow) {
+    if (!hasDeviceVoice) return false;
     try {
       speechSynthesis.cancel();
       if (!voice) pickVoice();
@@ -346,6 +345,81 @@
     } catch (e) {
       return false;
     }
+  }
+
+  /* ---------- recorded voice: voice/w (word), voice/s (slow word), voice/e (example),
+     voice/c (cheers). Made by tools/voice.py. Without them the device voice reads instead. ---------- */
+  const clips = new Map();
+  let noClips = !(window.VOCAB_VOICE || window.VOCAB_VOICE_INFO); // no recordings next to the page
+  let talking = null;
+  function clipBytes(key) {
+    const inline = window.VOCAB_VOICE;
+    if (inline) {
+      if (!inline[key]) return Promise.reject(new Error('missing'));
+      const bin = atob(inline[key]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return Promise.resolve(bytes.buffer);
+    }
+    return fetch('voice/' + key + '.mp3').then((r) => {
+      if (r.status === 404) noClips = true;
+      return r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status));
+    });
+  }
+  function clip(key) {
+    if (clips.has(key)) return clips.get(key);
+    const p = clipBytes(key).then((ab) => new Promise((res, rej) => ctx.decodeAudioData(ab, res, rej)));
+    clips.set(key, p);
+    p.catch(() => clips.delete(key));
+    if (clips.size > 60) clips.delete(clips.keys().next().value);
+    return p;
+  }
+  function playBuffer(buf, gain) {
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g);
+    g.connect(out);
+    src.start(now());
+    return src;
+  }
+  function stopTalking() {
+    if (talking && talking.src) { try { talking.src.stop(); } catch (e) { /* already ended */ } }
+    talking = null;
+    if (hasDeviceVoice) { try { speechSynthesis.cancel(); } catch (e) { /* no voice */ } }
+  }
+  function talk(key, text, slow) {
+    unlock();
+    if (!ctx || noClips) return deviceSpeak(text, slow);
+    stopTalking();
+    const me = {};
+    talking = me;
+    clip(key).then((buf) => {
+      if (talking === me) me.src = playBuffer(buf, 1.1);
+    }).catch(() => {
+      if (talking === me) deviceSpeak(text, slow);
+    });
+    return true;
+  }
+
+  Sound.canSpeak = hasDeviceVoice || !!window.VOCAB_VOICE || location.protocol !== 'file:';
+  Sound.word = (w, slow) => talk((slow ? 's/' : 'w/') + w, w, slow);
+  Sound.sentence = (w, text) => talk('e/' + w, text, false);
+  Sound.preload = (w) => {
+    if (!ctx || noClips) return;
+    clip('w/' + w).catch(() => {});
+    clip('e/' + w).catch(() => {});
+  };
+  // The cat teacher's cheers ("Great job!"): only with effects on, never cut off a word.
+  Sound.cheer = (name, delay = 0) => {
+    if (!ok() || noClips) return;
+    clip('c/' + name).then((buf) => setTimeout(() => playBuffer(buf, 1.0), delay)).catch(() => {});
+  };
+  Sound.voiceName = () => {
+    if (!voice) pickVoice();
+    const dev = voice ? voice.name : '없음';
+    return noClips ? dev : `녹음 목소리 (Kokoro) · 기기 목소리 ${dev}`;
   };
 
   window.Sound = Sound;

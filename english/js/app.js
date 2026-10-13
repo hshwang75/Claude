@@ -374,8 +374,9 @@
     if (Q.mode === 'meaning' || Q.mode === 'speed') body.innerHTML = meaningHTML(w);
     else if (Q.mode === 'spell') body.innerHTML = spellHTML(w);
     else body.innerHTML = listenHTML(w);
-    if (Q.mode === 'listen') Sound.speak(w.w);
-    else if (Q.mode === 'meaning' && Store.data.sound) Sound.speak(w.w);
+    if (Q.mode === 'listen') Sound.word(w.w);
+    else if (Q.mode === 'meaning' && Store.data.sound) Sound.word(w.w);
+    if (Q.mode !== 'speed') Sound.preload(w.w);
   }
 
   function meaningHTML(w) {
@@ -443,6 +444,7 @@
         later(() => {
           toast(text, c >= 5 ? 'big' : '');
           Sound.streak(c);
+          Sound.cheer(c === 3 ? 'nice' : c === 5 ? 'awesome' : 'wow', 380);
           if (c >= 5) confetti(c >= 10 ? 70 : 40);
         }, 260);
       }
@@ -625,7 +627,7 @@
     const gain = record(right);
     if (right) {
       later(() => { burst(slots, gain); Sound.correct(Q.combo); }, 120);
-      later(() => Sound.speak(Q.cur.w), 600);
+      later(() => Sound.word(Q.cur.w), 600);
     } else {
       Sound.wrong();
     }
@@ -696,6 +698,7 @@
       c.textContent = n || '시작!';
       if (!n) c.style.fontFamily = 'var(--f-kr)';
       Sound.count(n);
+      if (!n) Sound.cheer('go');
     }, 150 + k * 650));
     later(() => {
       Q.end = Date.now() + SPEED_SEC * 1000;
@@ -730,6 +733,7 @@
     Q.view = 'over';
     document.querySelectorAll('.choice').forEach((b) => { b.disabled = true; });
     Sound.timeUp();
+    Sound.cheer('done', 300);
     toast('끝!', 'big', 1100);
     later(finishQuiz, 1200);
   }
@@ -817,6 +821,7 @@
     later(() => {
       document.getElementById('stamp').classList.add('land');
       later(() => Sound.stamp(), 230);
+      Sound.cheer(['perfect', 'great', 'nice', 'try'][grade], 650);
       if (grade === 0) later(() => confetti(70), 260);
     }, t1 + 260);
     if (st) later(() => { const p = document.getElementById('prize'); p.style.opacity = ''; p.classList.add('new'); Sound.sticker(); }, t1 + 950);
@@ -873,9 +878,9 @@
       if (Q.kind === 'level') startQuiz('level', Q.mode, Q.level, Q.mode === 'speed' ? [] : pickWords(Q.level, QUIZ_LEN));
       else show('home');
     },
-    say: (a, b) => { Sound.speak(a); reshake(b, 'speaking'); },
-    slow: (a) => { Sound.speak(a, true); },
-    sayex: () => { if (Q && Q.cur) Sound.speak(Q.cur.e); },
+    say: (a, b) => { Sound.word(a); reshake(b, 'speaking'); },
+    slow: (a) => { Sound.word(a, true); },
+    sayex: () => { if (Q && Q.cur) Sound.sentence(Q.cur.w, Q.cur.e); },
     pick: (a, b) => pick(+a, b),
     tile: (a, b) => tile(+a, b),
     key: (a, b) => key(a, b),
