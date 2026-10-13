@@ -25,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ["js/words.js", "js/art.js", "js/voice.js", "js/sound.js", "js/store.js", "js/app.js"]
-ZIP_FILES = ["index.html", "manifest.webmanifest", "css", "js", "fonts", "audio", "icons", "voice"]
+ZIP_FILES = ["index.html", "manifest.webmanifest", "css", "js", "fonts", "audio", "icons"]
 SAMPLES = ["C4", "C5", "Ds5", "Fs5", "A5", "C6", "Ds6", "Fs6", "A6", "C7"]
 FONTS = [
     # (family, source file, css descriptors, letters to keep)
@@ -102,6 +102,19 @@ def stamp() -> str:
     return v
 
 
+def voice_bundles() -> dict[str, str]:
+    """The recordings packed by kind: voice-w.json, voice-s.json, voice-e.json, voice-c.json,
+    each mapping a word (or cheer) to its MP3 in base64. js/sound.js reads them when
+    window.VOCAB_VOICE is "bundles"."""
+    if not (ROOT / "voice").is_dir():
+        return {}
+    out = {}
+    for d in sorted(p for p in (ROOT / "voice").iterdir() if p.is_dir()):
+        out[f"voice-{d.name}.json"] = json.dumps({p.stem: base64.b64encode(p.read_bytes()).decode("ascii")
+                                                  for p in sorted(d.glob("*.mp3"))})
+    return out
+
+
 def build_page(out: Path, debug: bool) -> Path:
     """Everything in one page body: styles, scripts, fonts and the piano samples inline."""
     html = (ROOT / "index.html").read_text(encoding="utf-8")
@@ -121,11 +134,11 @@ def build_page(out: Path, debug: bool) -> Path:
     audio = {n: base64.b64encode((ROOT / "audio" / f"{n}.mp3").read_bytes()).decode("ascii") for n in SAMPLES}
     # The recorded pronunciations go next to the page as voice-w.json, voice-s.json, voice-e.json
     # and voice-c.json (publish them with it); js/sound.js fetches each kind the first time it is needed.
-    kinds = sorted(p.name for p in (ROOT / "voice").iterdir() if p.is_dir()) if (ROOT / "voice").is_dir() else []
-    for kind in kinds:
-        bundle = {p.stem: base64.b64encode(p.read_bytes()).decode("ascii") for p in sorted((ROOT / "voice" / kind).glob("*.mp3"))}
-        (out.parent / f"voice-{kind}.json").write_text(json.dumps(bundle), encoding="ascii")
-        print(f"voice-{kind}.json ({len(bundle)} clips)")
+    bundles = voice_bundles()
+    for name, text in bundles.items():
+        (out.parent / name).write_text(text, encoding="ascii")
+        print(name)
+    kinds = list(bundles)
     pre = (f"<script>window.VOCAB_AUDIO = {json.dumps(audio)};"
            + (' window.VOCAB_VOICE = "bundles";' if kinds else "")
            + (" window.VOCAB_DEBUG = true;" if debug else "") + "</script>\n")
@@ -142,6 +155,7 @@ def build_page(out: Path, debug: bool) -> Path:
 def build_zip(out_dir: Path) -> Path:
     v = kst_version()
     out = out_dir / f"vocab-quest-{v}.zip"
+    bundles = voice_bundles()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for name in ZIP_FILES:
             p = ROOT / name
@@ -153,8 +167,18 @@ def build_zip(out_dir: Path) -> Path:
                 if arc == "index.html":
                     data = re.sub(rb'<meta name="version" content="[^"]*">',
                                   f'<meta name="version" content="{v}">'.encode(), data)
+                    if bundles:
+                        tag = b'<script src="js/sound.js"></script>'
+                        assert tag in data
+                        data = data.replace(tag, b'<script>window.VOCAB_VOICE = "bundles";</script>\n' + tag)
                 z.writestr(arc, data)
-    print(f"{out} ({out.stat().st_size // 1024} KB)")
+        # itch.io takes at most 1,000 files in a browser game, so the 1,090 recordings go in
+        # as four bundles instead of one file each.
+        for name, text in bundles.items():
+            z.writestr(name, text)
+        count = len(z.namelist())
+    assert count <= 1000, f"{count} files: itch.io allows 1000"
+    print(f"{out} ({out.stat().st_size // 1024} KB, {count} files)")
     return out
 
 
