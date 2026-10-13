@@ -25,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ["js/words.js", "js/art.js", "js/voice.js", "js/sound.js", "js/store.js", "js/app.js"]
-ZIP_FILES = ["index.html", "manifest.webmanifest", "css", "js", "fonts", "audio", "icons"]
+ZIP_FILES = ["index.html", "manifest.webmanifest", "css", "js", "fonts", "audio", "icons", "voice"]
 SAMPLES = ["C4", "C5", "Ds5", "Fs5", "A5", "C6", "Ds6", "Fs6", "A6", "C7"]
 FONTS = [
     # (family, source file, css descriptors, letters to keep)
@@ -119,7 +119,12 @@ def build_page(out: Path, debug: bool) -> Path:
     html = html.replace('<script src="fonts/fonts.js"></script>',
                         "<script>\n" + (ROOT / "fonts" / "fonts.js").read_text(encoding="ascii") + "</script>")
     audio = {n: base64.b64encode((ROOT / "audio" / f"{n}.mp3").read_bytes()).decode("ascii") for n in SAMPLES}
-    pre = f"<script>window.VOCAB_AUDIO = {json.dumps(audio)};{' window.VOCAB_DEBUG = true;' if debug else ''}</script>\n"
+    # The recorded pronunciations (voice/w, s, e, c), keyed the way js/sound.js asks for them.
+    voice = {str(p.relative_to(ROOT / "voice").with_suffix("")): base64.b64encode(p.read_bytes()).decode("ascii")
+             for p in sorted((ROOT / "voice").rglob("*.mp3"))} if (ROOT / "voice").is_dir() else {}
+    pre = (f"<script>window.VOCAB_AUDIO = {json.dumps(audio)};"
+           + (f" window.VOCAB_VOICE = {json.dumps(voice)};" if voice else "")
+           + (" window.VOCAB_DEBUG = true;" if debug else "") + "</script>\n")
     for i, src in enumerate(SCRIPTS):
         code = (ROOT / src).read_text(encoding="utf-8")
         assert "</script" not in code, src

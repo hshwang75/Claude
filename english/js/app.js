@@ -255,6 +255,7 @@
       <p class="foot">영단어 퀘스트 · 버전 ${esc(VERSION)} · 글꼴 ${fontsOK() ? '적용됨' : '기본 글꼴'}<br>
         발음 목소리: ${esc(Sound.voiceName() || '없음')}<br>
         피아노 소리: Salamander Grand Piano (Alexander Holm, CC BY 3.0)<br>
+        발음 녹음: Kokoro-82M 음성 모델 (Apache 2.0)<br>
         글꼴: Jua · Gowun Dodum · Fredoka (SIL Open Font License)</p>
       <div class="spacer"></div>
       ${navHTML('stickers')}

@@ -53,10 +53,12 @@ python3 english/tools/build.py stamp            # 버전(한국 시각) 적기
 python3 english/tools/build.py page OUT.html    # 미리보기용 한 장짜리 페이지
 python3 english/tools/build.py zip 폴더          # itch.io 업로드용 zip
 node english/tools/icons.mjs                    # 홈 화면 아이콘 그리기
+python3 english/tools/voice.py all 모델폴더 af_heart  # 발음 녹음 다시 만들기
 ```
 
 ## 출처
 
 - 피아노 소리: [Salamander Grand Piano V3](https://archive.org/details/SalamanderGrandPianoV3) (Alexander Holm), [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). MP3는 [Tone.js audio](https://github.com/Tonejs/audio) 저장소에서 가져왔어요.
 - 글꼴: [Jua](https://fonts.google.com/specimen/Jua), [Gowun Dodum](https://fonts.google.com/specimen/Gowun+Dodum), [Fredoka](https://fonts.google.com/specimen/Fredoka) — 모두 SIL Open Font License 1.1 (`fonts/OFL-*.txt`). 앱에 쓰는 글자만 잘라서 넣었어요.
-- 단어 예문, 그림, 효과음은 이 앱을 위해 새로 만들었어요. 발음은 기기에 들어 있는 영어 음성으로 읽어요.
+- 발음 녹음(`voice/`): [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) v1.0 음성 모델(Apache 2.0)의 `af_heart` 목소리로 만들었어요. 단어, 천천히 읽는 단어, 예문, 고양이 선생님 응원이 들어 있고, 녹음이 없으면 기기의 영어 음성으로 읽어요. 다시 만들려면 `python3 english/tools/voice.py` 를 보세요.
+- 단어 예문, 그림, 효과음은 이 앱을 위해 새로 만들었어요.
