@@ -1,4 +1,5 @@
-/* Crayon Piano: keyboard, song menu, listen and follow-along modes, and screen layout. */
+/* Crayon Piano: keyboard, song menu, listen and follow-along modes, the two games (음 맞히기 and
+   리듬 놀이), and screen layout. */
 (function () {
   'use strict';
 
@@ -28,10 +29,14 @@
     keys: {},          // midi -> key element
     fx: null,
     kbSize: [0, 0],
-    mode: 'free',      // 'free' | 'listen' | 'follow'
+    mode: 'free',      // 'free' | 'listen' | 'follow' | 'quiz' | 'rhythm'
     song: null,
     listen: null,
     follow: null,
+    quiz: null,
+    rhythm: null,
+    rhythmSpeed: store.get('rhythm-speed') === 'normal' ? 'normal' : 'slow',
+    skySize: [0, 0],
     hintKey: null,
     ribbonNotes: [],
     ribbonAt: 0,
@@ -97,6 +102,8 @@
     if (!built || count !== built.count || Math.abs(kbW - built.W) > built.W * 0.1 || Math.abs(kbH - built.H) > built.H * 0.25) {
       buildKeyboard(kbW, kbH, count);
     }
+    const sky = $('sky');
+    state.skySize = sky.hidden ? [0, 0] : [sky.offsetWidth, sky.offsetHeight];
   }
 
   let rotateHintShown = false;
@@ -185,6 +192,7 @@
     kb.appendChild(state.fx);
     renderLabels();
     if (state.mode === 'follow') showHint();
+    if (state.quiz && state.quiz.hinted) hintAt(state.quiz.qs[state.quiz.i]);
   }
 
   function renderLabels() {
@@ -192,8 +200,9 @@
       const l = el.querySelector('.lbl');
       if (l) l.textContent = nameOf(+m);
     });
-    if (state.mode !== 'free') setRibbon(state.ribbonAt);
+    if (state.mode === 'listen' || state.mode === 'follow') setRibbon(state.ribbonAt);
     $('btn-labels').textContent = LABEL_TEXT[state.labels];
+    renderQuizLevels();
   }
   const KEYS_ICON = {
     big: '<svg viewBox="0 0 28 22" width="28" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="2" y="2" width="24" height="18" rx="2.5"/><path d="M10 2v18M18 2v18"/><path d="M10 2v9M18 2v9" stroke-width="5"/></svg>',
@@ -244,7 +253,9 @@
       toast(`소리를 켜고 있어요. 계속 안 나면 화면을 다시 톡 눌러 주세요. (소리: ${S.status}, 피아노 ${S.loaded}/22)`);
     }
     burst(k);
-    onUserNote(m);
+    if (state.mode === 'quiz') quizAnswer(m);
+    else if (state.mode === 'rhythm') rhythmHit(m);
+    else onUserNote(m);
     return v;
   }
   function userLift(p) {
@@ -295,7 +306,7 @@
     if (e.key === 'Escape') { escape(); return; }
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = state.keys[KEYMAP[e.code]];
-    if (!k || !$('start').hidden || menuOpen()) return;
+    if (!k || !$('start').hidden || menuOpen() || gamesOpen()) return;
     e.preventDefault();
     S.unlock();
     held.set(e.code, { k, v: userPress(k) });
@@ -361,6 +372,7 @@
   }
   function hideSongBar() {
     $('bar-song').hidden = true;
+    $('bar-game').hidden = true;
     $('bar-free').hidden = false;
   }
   // Only a short window of dots exists and the notes move through it, so a four-minute piece
@@ -588,7 +600,11 @@
     const F = state.follow;
     if (!F) return;
     setRibbon(F.i);
-    const m = tuneKey(F.notes[F.i], F.i), k = state.keys[m], g = state.geom[m];
+    hintAt(tuneKey(F.notes[F.i], F.i));
+  }
+  // Make key m shine, with the bouncing star above it.
+  function hintAt(m) {
+    const k = state.keys[m], g = state.geom[m];
     if (!k || !g) return;
     // Each key draws its glowing ring once and keeps it; CSS shows it while the key is hinted.
     if (!k._ring) {
@@ -629,6 +645,8 @@
   function stopSong() {
     state.request++;
     endListen();
+    endQuiz();
+    endRhythm();
     if (state.follow) { clearHint(); state.follow = null; }
     if (state.mode !== 'free') S.stopAll();
     state.mode = 'free';
@@ -715,12 +733,36 @@
     $('end-acts').appendChild(b);
   }
   onTap($('end-acts'), (b) => { $('end').hidden = true; b._act(); });
-  function showEnd(kind, song) {
+  // One to three big stars for a game, the ones not earned faded.
+  function bigStars(got) {
+    const row = Object.assign(document.createElement('span'), { className: 'big-stars' });
+    for (let i = 0; i < 3; i++) {
+      const im = new Image(60, 60);
+      im.alt = '';
+      im.src = C.doodleURL('star', 60, 3 + i);
+      if (i >= got) im.className = 'off';
+      im.style.animationDelay = (0.15 + i * 0.18).toFixed(2) + 's';
+      row.appendChild(im);
+    }
+    return row;
+  }
+  function showEnd(kind, song, info) {
     const slot = $('stamp-slot');
     slot.textContent = '';
     $('end-acts').textContent = '';
     $('confetti').textContent = '';
-    if (kind === 'follow') {
+    if (kind === 'quiz' || kind === 'rhythm') {
+      $('end-msg').textContent = kind === 'quiz'
+        ? (info.stars >= 9 ? `별 ${info.stars}개! 귀가 정말 밝아요!` : info.stars ? `별 ${info.stars}개를 모았어요!` : '끝까지 다 찾았어요!')
+        : `음표 ${info.total}개 중에 ${info.hits}개를 맞혔어요!`;
+      slot.appendChild(bigStars(info.got));
+      confetti();
+      cheer();
+      endButton(AGAIN_ICON + '한 번 더', '--c-mi', () => (kind === 'quiz' ? startQuiz(info.level) : startRhythm(song)));
+      endButton('<img data-doodle="star" data-size="24" data-seed="9" alt="">다른 놀이', '--c-sol', openGames);
+      endButton('건반 놀이', '--c-fa', () => {});
+      C.hydrate($('end-acts'));
+    } else if (kind === 'follow') {
       $('end-msg').textContent = `${song.title}, 끝까지 다 쳤어요!`;
       state.stamp = state.stamp || C.stamp(180, C.tok('--c-stamp'));
       slot.appendChild(state.stamp);
@@ -764,6 +806,339 @@
     });
   }
 
+  /* ---------- 놀이 menu ---------- */
+  const QUIZ_LEVELS = [
+    { name: '쉬움', notes: [60, 64, 67] },
+    { name: '보통', notes: [60, 62, 64, 65, 67] },
+    { name: '어려움', notes: [60, 62, 64, 65, 67, 69, 71, 72] },
+  ];
+  // The tunes written out in songs.js (not the whole pieces): short, steady and well known.
+  const RHYTHM_SONGS = SONGS.filter((s) => s.parsed && !s.jazz);
+  const RHYTHM_SPEED = { slow: 0.75, normal: 1 };
+  const dotName = (m) => (state.labels === 'letter' ? LETTERS : SOLFEGE)[pcOf(m)];
+
+  function renderQuizLevels() {
+    $('quiz-levels').innerHTML = QUIZ_LEVELS.map((lv, i) => `
+      <button class="cbtn level" type="button" data-quiz="${i}" style="--bg: var(--c-card)">
+        <b>${lv.name}</b><span class="mini">${lv.notes.map((m) => `<i style="--dc: ${DOT_COLORS[pcOf(m)]}">${dotName(m)}</i>`).join('')}</span>
+      </button>`).join('');
+  }
+  function buildGames() {
+    renderQuizLevels();
+    $('rhythm-songs').innerHTML = RHYTHM_SONGS.map((s, i) => `
+      <button class="cbtn chip" type="button" data-rhythm="${s.id}" style="--bg: color-mix(in srgb, var(${s.color}) 70%, var(--c-card))">
+        <img data-doodle="${s.doodle}" data-size="24" data-seed="${i + 30}"${s.doodleCol ? ` data-col="${s.doodleCol}"` : ''} alt="">${s.title}
+      </button>`).join('');
+    C.hydrate($('rhythm-songs'));
+    renderSpeed();
+    onTap($('games'), (b) => {
+      if (b.id === 'btn-games-close') closeGames();
+      else if (b.dataset.speed) {
+        state.rhythmSpeed = b.dataset.speed;
+        store.set('rhythm-speed', state.rhythmSpeed);
+        renderSpeed();
+      } else if (b.dataset.quiz) { closeGames(); startQuiz(+b.dataset.quiz); }
+      else if (b.dataset.rhythm) { closeGames(); startRhythm(SONGS.find((s) => s.id === b.dataset.rhythm)); }
+    });
+  }
+  function renderSpeed() {
+    $('rhythm-speed').querySelectorAll('[data-speed]').forEach((b) => b.classList.toggle('sel', b.dataset.speed === state.rhythmSpeed));
+  }
+  function openGames() {
+    stopSong();
+    $('end').hidden = true;
+    $('games').classList.remove('closed');
+  }
+  function closeGames() { $('games').classList.add('closed'); }
+  const gamesOpen = () => !$('games').classList.contains('closed');
+
+  function showGameBar(title, doodle, mode, replay) {
+    $('bar-free').hidden = true;
+    $('bar-song').hidden = true;
+    $('bar-game').hidden = false;
+    $('game-title').textContent = title;
+    $('game-mode').textContent = mode;
+    $('game-doodle').src = C.doodleURL(doodle, 34, 21);
+    $('btn-replay').hidden = !replay;
+    $('game-info').textContent = '';
+  }
+  onTap($('bar-game'), (b) => {
+    if (b.id === 'btn-game-stop') stopSong();
+    else if (b.id === 'btn-replay' && state.quiz && !state.quiz.busy) playTarget(state.quiz);
+  });
+
+  // A word of praise that pops up over the keys and fades.
+  let sayTimer = 0;
+  function say(text, ms = 1100) {
+    const el = $('say');
+    el.textContent = text;
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('pop');
+    clearTimeout(sayTimer);
+    sayTimer = setTimeout(() => { el.hidden = true; }, ms);
+  }
+  const pick = (list) => list[(Math.random() * list.length) | 0];
+  // Play note m and light its key for a moment.
+  function flash(m, dur, vel = 0.8) {
+    const t = S.now() + 0.02, k = state.keys[m];
+    S.play(m, { when: t, velocity: vel }).release(t + dur);
+    if (k) { lightOn(k); setTimeout(() => lightOff(k), dur * 1000); }
+  }
+
+  /* ---------- 음 맞히기: a note sounds, the child finds its key ---------- */
+  const QUIZ_COUNT = 10;
+  function startQuiz(level) {
+    stopSong();
+    const lv = QUIZ_LEVELS[level], qs = [];
+    while (qs.length < QUIZ_COUNT) {
+      const m = lv.notes[(Math.random() * lv.notes.length) | 0];
+      if (m !== qs[qs.length - 1]) qs.push(m); // never the same note twice in a row
+    }
+    state.mode = 'quiz';
+    const Q = state.quiz = { level, qs, i: 0, tries: 0, results: [], busy: true, hinted: false, timers: [] };
+    showGameBar('음 맞히기', 'bunny', `${lv.name} 단계`, true);
+    renderQuizInfo();
+    // First the notes of this level from low to high, each key lighting up: these are the ones to listen for.
+    say('이 소리들 중에 있어요', 1600);
+    lv.notes.forEach((m, j) => Q.timers.push(setTimeout(() => flash(m, 0.4, 0.7), 400 + j * 380)));
+    Q.timers.push(setTimeout(() => askQuiz(Q), 400 + lv.notes.length * 380 + 800));
+  }
+  function askQuiz(Q) {
+    if (state.quiz !== Q) return;
+    Q.busy = false;
+    Q.tries = 0;
+    Q.hinted = false;
+    clearHint();
+    renderQuizInfo();
+    playTarget(Q);
+  }
+  function playTarget(Q) {
+    const t = S.now() + 0.05;
+    S.play(Q.qs[Q.i], { when: t, velocity: 0.85 }).release(t + 1.2);
+    const b = $('btn-replay');
+    b.classList.remove('ping');
+    void b.offsetWidth;
+    b.classList.add('ping');
+  }
+  function quizAnswer(m) {
+    const Q = state.quiz;
+    if (!Q || Q.busy) return;
+    const want = Q.qs[Q.i];
+    clearTimeout(Q.again);
+    if (pcOf(m) === pcOf(want)) {
+      // Found it: a star the first time, a flower after a second listen.
+      Q.busy = true;
+      const first = Q.tries === 0;
+      Q.results.push(first ? 'star' : 'flower');
+      clearHint();
+      Q.hinted = false;
+      const k = state.keys[m];
+      if (k) burst(k, first ? 5 : 3);
+      say(first ? pick(['딩동댕!', '맞았어요!', '최고예요!', '정답이에요!']) : '찾았어요!');
+      const t = S.now() + 0.35;
+      S.play(m + 12, { when: t, velocity: 0.45 }).release(t + 0.5);
+      Q.i++;
+      renderQuizInfo();
+      Q.timers.push(setTimeout(() => (Q.i < QUIZ_COUNT ? askQuiz(Q) : finishQuiz(Q)), 1400));
+      return;
+    }
+    // Not this one: hear the question again. After two misses its key shines.
+    Q.tries++;
+    if (Q.tries >= 2 && !Q.hinted) {
+      Q.hinted = true;
+      hintAt(want);
+      say('반짝이는 건반이에요');
+    } else if (!Q.hinted) {
+      say('다시 들어 봐요');
+    }
+    Q.again = setTimeout(() => { if (state.quiz === Q && !Q.busy) playTarget(Q); }, 700);
+  }
+  function renderQuizInfo() {
+    const Q = state.quiz, box = $('game-info');
+    if (box.childElementCount !== QUIZ_COUNT) {
+      box.textContent = '';
+      for (let j = 0; j < QUIZ_COUNT; j++) box.appendChild(Object.assign(document.createElement('span'), { className: 'slot' }));
+    }
+    [...box.children].forEach((el, j) => {
+      const r = Q.results[j];
+      el.className = 'slot' + (r ? ' got' : j === Q.i ? ' now' : '');
+      if (r && !el.firstChild) {
+        const im = new Image();
+        im.alt = '';
+        im.src = C.doodleURL(r, 30, 5 + j, r === 'flower' ? '#ffb3c7' : null);
+        el.appendChild(im);
+      }
+    });
+  }
+  function endQuiz() {
+    const Q = state.quiz;
+    if (!Q) return;
+    Q.timers.forEach(clearTimeout);
+    clearTimeout(Q.again);
+    clearHint();
+    state.quiz = null;
+  }
+  function finishQuiz(Q) {
+    const stars = Q.results.filter((r) => r === 'star').length, level = Q.level;
+    endQuiz();
+    state.mode = 'free';
+    hideSongBar();
+    showEnd('quiz', null, { stars, level, got: stars >= 9 ? 3 : stars >= 6 ? 2 : 1 });
+  }
+
+  /* ---------- 리듬 놀이: crayon notes fall onto the keys ---------- */
+  const FALL = { slow: 2.4, normal: 2 };   // seconds a note takes from the top of the sky to the line
+  const NEAR = 0.32, GREAT = 0.11;          // how close to the line a tap counts (seconds)
+  function startRhythm(song) {
+    stopSong();
+    state.mode = 'rhythm';
+    state.song = song;
+    // The keys get shorter to make room for the sky the notes fall through.
+    root.classList.add('rhythm');
+    $('sky').hidden = false;
+    layout();
+    state.offsets = songOffsets(song);
+    const spb = 60 / (song.bpm * RHYTHM_SPEED[state.rhythmSpeed]), F = FALL[state.rhythmSpeed];
+    const notes = [];
+    let beat = 0;
+    for (const n of song.parsed) {
+      if (n.midi != null) notes.push({ midi: n.midi, i: notes.length, at: beat * spb, len: n.beats * spb, el: null, hit: false, miss: false, sounded: false });
+      beat += n.beats;
+    }
+    // Count in "셋, 둘, 하나" while the first notes are already falling.
+    const lead = Math.max(F, 3 * spb) + 0.6;
+    const R = state.rhythm = { song, notes, F, spb, t0: wallClock() + lead, first: 0, hits: 0, great: 0, raf: 0, timers: [], lanes: [] };
+    showGameBar(song.title, song.doodle, `리듬 놀이 · ${state.rhythmSpeed === 'slow' ? '천천히' : '보통'}`, false);
+    renderRhythmInfo();
+    drawLanes(R);
+    ['셋', '둘', '하나'].forEach((w, j) => R.timers.push(setTimeout(() => {
+      if (state.rhythm !== R) return;
+      skySay(w, 50, true);
+      const t = S.now() + 0.01;
+      S.play(84, { when: t, velocity: 0.3 }).release(t + 0.15);
+    }, (lead - (3 - j) * spb) * 1000)));
+    const frame = () => {
+      if (state.rhythm !== R) return;
+      rhythmFrame(R, wallClock() - R.t0);
+      R.raf = requestAnimationFrame(frame);
+    };
+    R.raf = requestAnimationFrame(frame);
+  }
+  // A faint stripe above each key the song uses, so it is clear where each note will land.
+  function drawLanes(R) {
+    const box = $('sky-notes');
+    box.textContent = '';
+    const keys = new Set(R.notes.map((n) => tuneKey(n.midi, n.i)));
+    keys.forEach((m) => {
+      const g = state.geom[m];
+      if (!g) return;
+      const lane = document.createElement('div');
+      lane.className = 'lane';
+      lane.style.left = `${((g.x - (g.black ? 0.3 : 0.5) / state.built.count) * 100).toFixed(3)}%`;
+      lane.style.width = `${((g.black ? 0.6 : 1) / state.built.count * 100).toFixed(3)}%`;
+      lane.style.setProperty('--dc', DOT_COLORS[pcOf(m)]);
+      box.appendChild(lane);
+    });
+  }
+  function rhythmFrame(R, now) {
+    const [W, H] = state.skySize, line = H - 14, notes = R.notes;
+    if (!H) return;
+    for (let j = R.first; j < notes.length; j++) {
+      const n = notes[j];
+      if (n.at - now > R.F) break;
+      // The tune plays softly by itself, so a missed note never leaves a hole; a tapped note is loud.
+      if (!n.sounded && n.at - now < 0.05) {
+        n.sounded = true;
+        if (!n.hit && S.running) {
+          const t = S.now() + Math.max(0, n.at - now);
+          S.play(n.midi, { when: t, velocity: 0.22 }).release(t + n.len * 0.9);
+        }
+      }
+      if (!n.hit && !n.miss && now - n.at > NEAR) {
+        n.miss = true;
+        if (n.el) n.el.classList.add('miss');
+      }
+      const m = tuneKey(n.midi, n.i), g = state.geom[m];
+      if (!n.el && !n.hit && g) {
+        const size = Math.round(Math.min(g.w * 0.82, 52, H * 0.34));
+        const el = n.el = document.createElement('div');
+        el.className = 'fall' + (isBlack(m) ? ' sharp' : '');
+        el.textContent = nameOf(m);
+        el.style.cssText = `left: ${(g.x * 100).toFixed(3)}%; width: ${size}px; height: ${size}px; margin: ${-size / 2}px 0 0 ${-size / 2}px; font-size: ${Math.round(size * 0.48)}px`;
+        el.style.setProperty('--dc', DOT_COLORS[pcOf(m)]);
+        $('sky-notes').appendChild(el);
+      }
+      if (n.el && !n.hit) n.el.style.transform = `translateY(${(line * (1 - (n.at - now) / R.F)).toFixed(1)}px)`;
+      // Gone below the line: take it away.
+      if (n.miss && now - n.at > 0.6 && n.el) { n.el.remove(); n.el = null; }
+      if (j === R.first && (n.hit || n.miss) && !n.el) R.first++;
+    }
+    const last = notes[notes.length - 1];
+    if (R.first >= notes.length && now > last.at + last.len + 0.6) finishRhythm(R);
+  }
+  function rhythmHit(m) {
+    const R = state.rhythm;
+    if (!R) return;
+    const now = wallClock() - R.t0;
+    let best = null;
+    for (let j = R.first; j < R.notes.length; j++) {
+      const n = R.notes[j];
+      if (n.at - now > NEAR) break;
+      if (n.hit || n.miss || tuneKey(n.midi, n.i) !== m) continue;
+      if (!best || Math.abs(n.at - now) < Math.abs(best.at - now)) best = n;
+    }
+    if (!best || Math.abs(best.at - now) > NEAR) return;
+    best.hit = true;
+    R.hits++;
+    const great = Math.abs(best.at - now) <= GREAT;
+    if (great) R.great++;
+    const g = state.geom[m];
+    if (best.el) {
+      const el = best.el;
+      best.el = null;
+      el.classList.add('hit');
+      el.addEventListener('animationend', () => el.remove());
+      setTimeout(() => el.remove(), 600);
+    }
+    if (g) skySay(great ? '최고!' : '좋아요!', g.x * 100);
+    renderRhythmInfo();
+  }
+  function skySay(text, xPct, big) {
+    const el = document.createElement('div');
+    el.className = 'word' + (big ? ' big' : '');
+    el.textContent = text;
+    el.style.left = xPct.toFixed(2) + '%';
+    el.addEventListener('animationend', () => el.remove());
+    $('sky-say').appendChild(el);
+    setTimeout(() => el.remove(), 1500);
+  }
+  function renderRhythmInfo() {
+    const R = state.rhythm;
+    $('game-info').innerHTML = `<span class="score"><img src="${C.doodleURL('star', 30, 7)}" alt="">${R.hits}<small>/ ${R.notes.length}</small></span>`;
+  }
+  function endRhythm() {
+    const R = state.rhythm;
+    if (!R) return;
+    cancelAnimationFrame(R.raf);
+    R.timers.forEach(clearTimeout);
+    state.rhythm = null;
+    $('sky-notes').textContent = '';
+    $('sky-say').textContent = '';
+    $('sky').hidden = true;
+    root.classList.remove('rhythm');
+    layout();
+  }
+  function finishRhythm(R) {
+    const { song, hits } = R, total = R.notes.length, part = hits / total;
+    endRhythm();
+    state.mode = 'free';
+    state.song = null;
+    hideSongBar();
+    showEnd('rhythm', song, { hits, total, got: part >= 0.85 ? 3 : part >= 0.55 ? 2 : 1 });
+  }
+
   /* ---------- start, full screen, screen wake ---------- */
   const fsSupported = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
   $('btn-full').hidden = !fsSupported;
@@ -803,6 +1178,7 @@
   });
   onTap($('bar-free'), (b) => {
     if (b.id === 'btn-songs') openMenu();
+    else if (b.id === 'btn-games') openGames();
     else if (b.id === 'btn-full') { if (isFullscreen()) exitFullscreen(); else enterFullscreen(); }
     else if (b.id === 'btn-keys') {
       state.wide = !state.wide;
@@ -821,13 +1197,14 @@
   onTap($('btn-menu-close').parentElement, (b) => { if (b.id === 'btn-menu-close') closeMenu(); });
   function escape() {
     if (menuOpen()) closeMenu();
+    else if (gamesOpen()) closeGames();
     else if (!$('end').hidden) $('end').hidden = true;
     else if (state.mode !== 'free') stopSong();
   }
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') { if ($('start').hidden) keepAwake(); }
-    else if (state.mode === 'listen') stopSong();
+    else if (state.mode === 'listen' || state.mode === 'rhythm') stopSong();
   });
 
   // A small note at the bottom of the screen. Errors show here too, so a photo of the screen
@@ -897,6 +1274,7 @@
   window.addEventListener('scroll', () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); });
 
   buildMenu();
+  buildGames();
   layout();
   renderLabels();
   renderKeysButton();
@@ -910,7 +1288,9 @@
   // Fetch the handwriting font's Korean letters for every screen now, not on the first visit
   // to each screen (the font comes in many small pieces, one per group of letters).
   if (document.fonts && document.fonts.load) {
-    const text = stage.textContent + '끝까지다쳤어요잘들었어요이제따라쳐볼까요한번더다른노래건반놀이재즈로듣기참잘했어요넓은큰진짜피아노처럼오른손이많아요누르기쉬워요';
+    const text = stage.textContent + '끝까지다쳤어요잘들었어요이제따라쳐볼까요한번더다른노래건반놀이재즈로듣기참잘했어요넓은큰진짜피아노처럼오른손이많아요누르기쉬워요' +
+      '이소리들중에있어요딩동댕맞았어요최고예요정답이에요찾았어요반짝이는건반이에요다시들어봐요셋둘하나좋아요' +
+      '별개를모았어요귀가정말밝아요끝까지다찾았어요음표중에맞혔어요다른놀이리듬음맞히기천천히보통쉬움어려움';
     document.fonts.load('24px Jua', text).catch(() => {});
   }
 })();

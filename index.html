@@ -23,6 +23,7 @@
   <header id="topbar">
     <div class="bar" id="bar-free">
       <button id="btn-songs" class="cbtn" type="button" style="--bg: var(--c-do)"><img data-doodle="note" data-size="24" data-col="--c-black" alt="">노래</button>
+      <button id="btn-games" class="cbtn" type="button" style="--bg: var(--c-mi)"><img data-doodle="star" data-size="24" data-seed="9" alt="">놀이</button>
       <div class="logo-wrap"><img data-doodle="teddy" data-size="48" data-seed="2" alt=""><span class="logo" data-logo></span><img data-doodle="heart" data-size="26" data-seed="3" alt=""></div>
       <div class="spacer"></div>
       <button id="btn-keys" class="cbtn sq" type="button" style="--bg: var(--c-la)" aria-label="큰 건반"></button>
@@ -30,10 +31,16 @@
       <button id="btn-full" class="cbtn sq" type="button" style="--bg: var(--c-sol)" aria-label="전체 화면" hidden>
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.5C4 4.7 4.7 4 5.5 4H9M15 4h3.5c.8 0 1.5.7 1.5 1.5V9M20 15v3.5c0 .8-.7 1.5-1.5 1.5H15M9 20H5.5C4.7 20 4 19.3 4 18.5V15"/></svg>
       </button>
-      <img class="deco" data-doodle="flower" data-size="22" data-seed="4" alt="" style="left: 19%; top: 8px">
-      <img class="deco" data-doodle="star" data-size="16" data-seed="5" alt="" style="left: 24%; top: 40px">
       <img class="deco" data-doodle="flower" data-size="18" data-seed="6" data-col="#b9c4ff" alt="" style="left: 72%; top: 8px">
       <img class="deco" data-doodle="heart" data-size="14" data-seed="7" alt="" style="left: 75.5%; top: 40px">
+    </div>
+    <div class="bar" id="bar-game" hidden>
+      <button id="btn-game-stop" class="cbtn sm" type="button" style="--bg: var(--c-do)"><span class="stop-ic"></span>그만</button>
+      <div class="song-name"><img id="game-doodle" alt=""><div><b id="game-title"></b><small id="game-mode"></small></div></div>
+      <div class="game-info" id="game-info"></div>
+      <button id="btn-replay" class="cbtn sm" type="button" style="--bg: var(--c-sol)">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg>다시 듣기
+      </button>
     </div>
     <div class="bar" id="bar-song" hidden>
       <button id="btn-stop" class="cbtn sm" type="button" style="--bg: var(--c-do)"><span class="stop-ic"></span>그만</button>
@@ -42,6 +49,7 @@
     </div>
   </header>
 
+  <div id="sky" class="sky" hidden aria-hidden="true"><div class="sky-line"></div><div class="sky-notes" id="sky-notes"></div><div class="sky-say" id="sky-say"></div></div>
   <main id="kb" class="kb" aria-label="피아노 건반"></main>
 
   <section id="menu" class="overlay closed" aria-label="노래 고르기">
@@ -60,6 +68,36 @@
     </div>
   </section>
 
+  <section id="games" class="overlay closed" aria-label="놀이 고르기">
+    <div class="panel">
+      <div class="bar static">
+        <button id="btn-games-close" class="cbtn sm" type="button" style="--bg: var(--c-la)">✕ 닫기</button>
+        <div class="logo-wrap"><img data-doodle="bunny" data-size="44" data-seed="13" alt=""><span class="title">어떤 놀이를 할까요?</span><img data-doodle="star" data-size="26" data-seed="14" alt=""></div>
+      </div>
+      <div class="games-grid" id="games-grid">
+        <div class="game-card" style="--cc: var(--c-sol)">
+          <div class="gc-head">
+            <img data-doodle="bunny" data-size="62" data-seed="15" alt="">
+            <div><h3>음 맞히기</h3><p>소리를 잘 듣고 같은 건반을 찾아요</p></div>
+          </div>
+          <div class="gc-levels" id="quiz-levels"></div>
+        </div>
+        <div class="game-card" style="--cc: var(--c-do)">
+          <div class="gc-head">
+            <img data-doodle="note" data-size="62" data-seed="16" alt="">
+            <div><h3>리듬 놀이</h3><p>음표가 선에 닿을 때 건반을 눌러요</p></div>
+          </div>
+          <div class="gc-songs" id="rhythm-songs"></div>
+          <div class="gc-speed" id="rhythm-speed">
+            <span>빠르기</span>
+            <button class="cbtn sm" type="button" data-speed="slow" style="--bg: var(--c-fa)">천천히</button>
+            <button class="cbtn sm" type="button" data-speed="normal" style="--bg: var(--c-re)">보통</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="end" class="overlay veil" hidden aria-live="polite">
     <div class="panel end-panel">
       <div class="confetti" id="confetti"></div>
@@ -73,6 +111,7 @@
     </div>
   </section>
 
+  <div id="say" class="say" hidden aria-live="polite"></div>
   <div id="toast" class="toast" role="status" hidden></div>
 
   <section id="start" class="overlay start" aria-label="시작">

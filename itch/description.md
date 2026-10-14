@@ -13,7 +13,7 @@
 | Uploads | `dist/crayon-piano-itch.zip` → **This file will be played in the browser** 체크 |
 | Embed options | Viewport 960 × 540, **Mobile friendly** 체크, Orientation **Landscape**, **Fullscreen button** 체크 |
 | Cover image | `itch/cover.png` |
-| Screenshots | `itch/shot-1-start.png` ~ `itch/shot-5-done.png` |
+| Screenshots | `itch/shot-1-start.png` ~ `itch/shot-7-rhythm.png` |
 | Genre | Educational |
 | Tags | piano, music, kids, educational, crayon |
 | Visibility | 먼저 Draft로 저장해서 확인 → Public |
@@ -27,8 +27,10 @@
 
 • 건반을 누르면 그 음의 색으로 크레파스가 칠해지고 하트, 별, 꽃, 음표가 퐁퐁 올라가요.
 • 진짜 그랜드 피아노를 녹음한 소리가 나요.
-• 유명한 클래식 21곡을 듣고 따라 칠 수 있어요: 작은 별, 엘리제를 위하여, 터키 행진곡, 아름답고 푸른 도나우, 군대 행진곡, 송어, 엔터테이너 등
+• 노래 39곡을 듣고 따라 칠 수 있어요: 작은 별, 생일 축하 노래, 엘리제를 위하여, 터키 행진곡, 군대 행진곡, 병정 행진곡, 메이플 리프 래그, 소나티네, 미뉴에트, 엔터테이너 등
 • 따라치기에서는 칠 건반이 반짝이고, 끝까지 치면 "참 잘했어요" 도장이 찍혀요.
+• 음 맞히기 놀이: 소리를 듣고 같은 건반을 찾아 별을 모아요. (쉬움 · 보통 · 어려움)
+• 리듬 놀이: 크레용 음표가 떨어질 때 박자에 맞춰 건반을 눌러요.
 • 건반 이름표를 도레미, CDE, 이름 없음 중에서 고를 수 있어요.
 • 크고 누르기 쉬운 건반과, 진짜 피아노 오른손처럼 넓은 건반 중에서 고를 수 있어요.
 
@@ -37,9 +39,9 @@
 
 ---
 
-Crayon Piano: a hand-drawn crayon piano for kids. Tap the keys to color them in, listen to 21 classical pieces, and play along as the next key lights up.
+Crayon Piano: a hand-drawn crayon piano for kids. Tap the keys to color them in, listen to 39 songs and classical pieces, play along as the next key lights up, find the key by ear, and tap falling crayon notes in time.
 
 피아노 소리 / Piano sound: Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0)
 글꼴 / Font: Jua (SIL Open Font License)
-악보 / Scores: Mutopia Project
+악보 / Scores: Mutopia Project (병정 행진곡 · 용감한 기수 · 즐거운 농부: CC BY-SA 2.5, 사냥꾼의 노래 · 피아노 소나타 16번: CC BY-SA 3.0, 아름답고 푸른 도나우: CC BY-SA 4.0)
 ```
