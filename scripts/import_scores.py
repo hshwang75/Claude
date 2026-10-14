@@ -49,11 +49,32 @@ PIECES = {
     "sonatina": dict(path="ClementiM/O36/sonatina-1/sonatina-1.ly", melody=1, license="Public Domain", midi_index=0),
     "sonatafacile": dict(path="MozartWA/KV545/K545-1/K545-1.ly", melody=1, license="CC BY-SA 3.0"),
     "schubertlullaby": dict(path="SchubertF/D498/schubert_wiegen_lied/schubert_wiegen_lied.ly", melody=1, license="Public Domain"),
+    # Cheerful marches, rags and dances.
+    "maple": dict(path="JoplinS/maple/maple.ly", melody=1, license="Public Domain", speed=0.85),
+    "winners": dict(path="JoplinS/winners/winners.ly", melody=1, license="Public Domain", speed=1.4),
+    "littlemarch": dict(path="SchumannR/O68/schumann-op68-02-marche-militaire/schumann-op68-02-marche-militaire.ly", melody=1, license="CC BY-SA 2.5"),
+    "rider": dict(path="SchumannR/O68/schumann-op68-08-cavalier-sauvage/schumann-op68-08-cavalier-sauvage.ly", melody=1, license="CC BY-SA 2.5"),
+    "hunter": dict(path="SchumannR/O68/schumann-op68-07-chanson-du-chasseur/schumann-op68-07-chanson-du-chasseur.ly", melody=1, license="CC BY-SA 3.0"),
+    "wedding": dict(path="GriegE/O65/troldhaugen/troldhaugen.ly", melody=1, license="Public Domain"),
+    "styrienne": dict(path="BurgmullerJFF/O100/25EF-14/25EF-14.ly", melody=1, license="Public Domain"),
+    "rondo": dict(path="KuhlauF/O20/sonatine-1-rondo/sonatine-1-rondo.ly", melody=1, license="Public Domain"),
+    "presto": dict(path="HaydnFJ/HOB-XVI-27/hob-xvi-27-iii-presto/hob-xvi-27-iii-presto.ly", melody=1, license="Public Domain"),
+    # More sonatinas and minuets.
+    "kuhlau": dict(path="KuhlauF/O20/sonatine-1-allegro/sonatine-1-allegro.ly", melody=1, license="Public Domain"),
+    "mozartrondo": dict(path="MozartWA/KV545/K545-3/K545-3.ly", melody=1, license="Public Domain"),
+    "mozartminuet": dict(path="MozartWA/KV2/menuet_k2/menuet_k2.ly", melody=1, license="Public Domain", speed=2.0),
+    "musette": dict(path="BachJS/BWVAnh126/anna-magdalena-22/anna-magdalena-22.ly", melody=1, license="Public Domain"),
+    "minuet2": dict(path="BachJS/BWVAnh116/anna-magdalena-07/anna-magdalena-07.ly", melody=1, license="Public Domain"),
+    "easysonata": dict(path="BeethovenLv/O49/LVB_Sonate_49no2_1/LVB_Sonate_49no2_1.ly", melody=1, license="Public Domain"),
+    "menuetto": dict(path="BeethovenLv/O49/LVB_Sonate_49no2_2/LVB_Sonate_49no2_2.ly", melody=1, license="Public Domain"),
 }
 
 
 # Small source fixes for scores written for old LilyPond versions.
+STACCATISSIMO = [(r"-\|", "-!")]  # old spelling of the staccatissimo mark
 FIXES = {
+    "BurgmullerJFF/O100/25EF-14/25EF-14.ly": STACCATISSIMO,
+    "HaydnFJ/HOB-XVI-27/hob-xvi-27-iii-presto/hob-xvi-27-iii-presto.ly": STACCATISSIMO,
     "SchubertF/D550/forelle/forelle-lys/forelle.ly": [
         (r"\\lyricsto mel \\new Lyrics \{ \\text \}", r"\\new Lyrics \\lyricsto mel { \\text }"),
         (r"\\context Dynamics\s*=\s*dynamics", r'\\context Dynamics = "dynamics"'),

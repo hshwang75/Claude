@@ -13,6 +13,16 @@
               C4 C4 G4 G4 | A4 A4 G4:2 | F4 F4 E4 E4 | D4 D4 C4:2`,
     },
     {
+      id: 'airplane', title: '비행기', composer: '미국 동요', level: 1, doodle: 'cloud', color: '--c-sol', bpm: 104,
+      notes: `E4 D4 C4 D4 | E4 E4 E4:2 | D4 D4 D4:2 | E4 G4 G4:2 |
+              E4 D4 C4 D4 | E4 E4 E4:2 | D4 D4 E4 D4 | C4:4`,
+    },
+    {
+      id: 'birthday', title: '생일 축하 노래', composer: '힐 자매', level: 1, doodle: 'heart', color: '--c-do', bpm: 96,
+      notes: `G4:.75 G4:.25 | A4 G4 C5 | B4:2 G4:.75 G4:.25 | A4 G4 D5 | C5:2 G4:.75 G4:.25 |
+              G5 E5 C5 | B4 A4 F5:.75 F5:.25 | E5 C5 D5 | C5:3`,
+    },
+    {
       id: 'home', title: '꿈속의 고향', composer: '드보르자크', level: 1, doodle: 'house', color: '--c-fa', bpm: 72,
       notes: `E4:1.5 G4:.5 G4:2 | E4:1.5 D4:.5 C4:2 | D4 E4 G4 E4 | D4:4 |
               E4:1.5 G4:.5 G4:2 | E4:1.5 D4:.5 C4:2 | D4 E4 D4:1.5 C4:.5 | C4:4`,
@@ -46,11 +56,29 @@
     { id: 'entertainer', title: '엔터테이너', composer: '스콧 조플린', level: 3, doodle: 'note', color: '--c-mi', score: true, length: '4:12' },
     { id: 'puppy', title: '강아지 왈츠', composer: '쇼팽', level: 3, doodle: 'heart', color: '--c-do', score: true, length: '1:29' },
     { id: 'military', title: '군대 행진곡', composer: '슈베르트', level: 3, doodle: 'star', color: '--c-re', score: true, length: '4:32' },
+    // Cheerful marches, rides and rags.
+    { id: 'littlemarch', title: '병정 행진곡', composer: '슈만', level: 2, doodle: 'star', color: '--c-sol', score: true, length: '0:47' },
+    { id: 'rider', title: '용감한 기수', composer: '슈만', level: 2, doodle: 'sun', color: '--c-re', score: true, length: '0:38' },
+    { id: 'hunter', title: '사냥꾼의 노래', composer: '슈만', level: 2, doodle: 'rainbow', color: '--c-fa', score: true, length: '1:12' },
+    { id: 'styrienne', title: '스티리엔느', composer: '부르크뮐러', level: 2, doodle: 'flower', color: '--c-la', score: true, length: '1:09' },
+    { id: 'maple', title: '메이플 리프 래그', composer: '스콧 조플린', level: 3, doodle: 'note', color: '--c-do', score: true, length: '2:49' },
+    { id: 'winners', title: '이지 위너스', composer: '스콧 조플린', level: 3, doodle: 'star', color: '--c-mi', score: true, length: '3:37' },
+    { id: 'wedding', title: '트롤하우겐의 결혼식 날', composer: '그리그', level: 3, doodle: 'heart', color: '--c-si', score: true, length: '6:06' },
     { id: 'gymnopedie', title: '짐노페디 1번', composer: '사티', level: 2, doodle: 'cloud', color: '--c-la', score: true, length: '3:23' },
     { id: 'traumerei', title: '트로이메라이', composer: '슈만', level: 2, doodle: 'moon', color: '--c-si', score: true, length: '1:50' },
     { id: 'arabesque', title: '아라베스크', composer: '부르크뮐러', level: 2, doodle: 'flower', color: '--c-fa', score: true, length: '0:43' },
     { id: 'sonatina', title: '소나티네', composer: '클레멘티', level: 3, doodle: 'note', color: '--c-mi', score: true, length: '1:56' },
     { id: 'sonatafacile', title: '피아노 소나타 16번', composer: '모차르트', level: 3, doodle: 'star', color: '--c-sol', score: true, length: '4:25' },
+    // More sonatinas and minuets.
+    { id: 'mozartrondo', title: '소나타 16번 론도', composer: '모차르트', level: 3, doodle: 'note', color: '--c-re', score: true, length: '1:33' },
+    { id: 'kuhlau', title: '소나티네 1악장', composer: '쿨라우', level: 3, doodle: 'sun', color: '--c-fa', score: true, length: '3:41' },
+    { id: 'rondo', title: '소나티네 론도', composer: '쿨라우', level: 3, doodle: 'rainbow', color: '--c-la', score: true, length: '2:37' },
+    { id: 'easysonata', title: '소나타 20번 1악장', composer: '베토벤', level: 3, doodle: 'cloud', color: '--c-do', score: true, length: '3:25' },
+    { id: 'menuetto', title: '소나타 20번 미뉴에트', composer: '베토벤', level: 3, doodle: 'flower', color: '--c-mi', score: true, length: '2:41' },
+    { id: 'presto', title: '소나타 프레스토', composer: '하이든', level: 3, doodle: 'star', color: '--c-si', score: true, length: '3:44' },
+    { id: 'musette', title: '뮈제트', composer: '바흐', level: 2, doodle: 'house', color: '--c-sol', score: true, length: '0:40' },
+    { id: 'minuet2', title: '미뉴에트 2', composer: '바흐', level: 2, doodle: 'heart', color: '--c-fa', score: true, length: '1:55' },
+    { id: 'mozartminuet', title: '꼬마 미뉴에트', composer: '모차르트', level: 1, doodle: 'teddy', color: '--c-do', score: true, length: '0:48' },
   ];
 
   const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
